@@ -3,9 +3,12 @@ requires = ["setuptools>=84"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lingxi-identity"
+name = "LingxiIdentity"
 version = "0.1.0"
 description = "Provider-neutral Python SDK for LingxiIdentity"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{name = "LingXi-Org"}]
 requires-python = ">=3.13"
 dependencies = [
   "httpx>=0.28,<0.29",
