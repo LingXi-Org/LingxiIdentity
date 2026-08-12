@@ -29,7 +29,7 @@ Run only:
 docker compose --env-file .env -f deployment/compose.yaml up -d --build
 ```
 
-Terminate TLS at the external ingress and forward `X-Forwarded-Proto: https`. Route the identity hostname to Logto port 3001 and the BFF hostname to port 8080. Never route or publish Logto port 3002.
+Terminate TLS at the external ingress and forward `X-Forwarded-Proto: https`. Route the identity hostname to Logto port 3001 and the BFF hostname to port 8080. Logto port 3002 is bound to loopback only and must never be exposed by the ingress or firewall.
 
 Minimal Nginx, Caddy and Kubernetes Ingress examples are in `docs/edge-proxy/`. Adapt service names, certificates and network policy to the target environment.
 

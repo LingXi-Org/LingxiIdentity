@@ -40,10 +40,12 @@ services:
       DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
       PORT: 3001
       ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
+      ADMIN_ENDPOINT: ${LOGTO_ADMIN_ENDPOINT:-}
       TRUST_PROXY_HEADER: ${LOGTO_TRUST_PROXY_HEADER:-0}
       ADMIN_DISABLE_LOCALHOST: ${LOGTO_ADMIN_DISABLE_LOCALHOST:-true}
     ports:
-      - "${LOGTO_PORT:-3001}:3001"
+      - "127.0.0.1:${LOGTO_PORT:-3001}:3001"
+      - "127.0.0.1:${LOGTO_ADMIN_PORT:-3002}:3002"
     volumes:
       - logto_connectors:/etc/logto/packages/core/connectors
     healthcheck:
