@@ -26,7 +26,7 @@ packages = []
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 asyncio_mode = "auto"
-pythonpath = ["sdk/python/src", "server/src", "bootstrap"]
+pythonpath = [".", "sdk/python/src", "server/src", "bootstrap"]
 markers = [
   "e2e: requires a running configured Logto stack",
 ]
