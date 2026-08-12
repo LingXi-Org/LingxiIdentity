@@ -31,7 +31,7 @@ prod-up:
 	$(COMPOSE) up -d --build
 
 bootstrap:
-	$(BOOTSTRAP_COMPOSE) run --rm bootstrap
+	$(BOOTSTRAP_COMPOSE) run --rm --no-deps bootstrap
 
 smoke:
 	$(COMPOSE) run --rm smoke

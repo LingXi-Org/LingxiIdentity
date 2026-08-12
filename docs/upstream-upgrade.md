@@ -1,8 +1,8 @@
 # Upstream upgrade policy
 
-1. Pin a released `ghcr.io/logto-io/logto:vX.Y.Z` image; never use `latest` in production.
+1. The deployment uses `ghcr.io/logto-io/logto:latest`; review the upstream release before upgrading.
 2. Read the Logto release notes for database alterations and Management API changes.
-3. Set `LOGTO_VERSION` in a disposable environment and run `make compose-config`, `make test` and `make smoke`.
+3. Run `make compose-config`, `make test` and `make smoke` in a disposable environment.
 4. Back up both PostgreSQL databases.
 5. Deploy the new image and wait for the official alteration command to finish.
 6. Verify Discovery, JWKS, M2M token acquisition, BFF health and representative user/organization operations.

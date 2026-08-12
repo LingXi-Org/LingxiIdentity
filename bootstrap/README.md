@@ -14,7 +14,7 @@ BOOTSTRAP_ADMIN_PASSWORD=use-a-temporary-strong-password
 先启动 `postgres` 与 `logto`，再运行：
 
 ```powershell
-docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml run --rm bootstrap
+docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml run --rm --no-deps bootstrap
 ```
 
 脚本会幂等创建 API resources/scopes、global role、organization role、默认组织及初始管理员 membership、BFF Web 应用、LingxiLearn Public SPA、BFF Management M2M、claims customizer 与 branding，并把生成的 credentials 写入 `BOOTSTRAP_OUTPUT_FILE` 指定文件。Public SPA 只输出 client ID，不生成或输出 client secret。不要把该文件提交到 Git。

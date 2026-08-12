@@ -18,7 +18,7 @@ services:
     networks: [lingxi]
 
   logto-migrate:
-    image: ghcr.io/logto-io/logto:${LOGTO_VERSION:-v1.42.0}
+    image: ghcr.io/logto-io/logto:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
     networks: [lingxi]
 
   logto:
-    image: ghcr.io/logto-io/logto:${LOGTO_VERSION:-v1.42.0}
+    image: ghcr.io/logto-io/logto:latest
     depends_on:
       logto-migrate:
         condition: service_completed_successfully
@@ -120,9 +120,6 @@ services:
       context: ..
       dockerfile: bootstrap/Dockerfile
     profiles: [bootstrap]
-    depends_on:
-      logto:
-        condition: service_healthy
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOGTO_PUBLIC_ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}

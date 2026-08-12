@@ -18,7 +18,7 @@ docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.
 开发 bootstrap profile 会把 Logto Admin Console 绑定到本机 `http://localhost:3002`。首次启动时，在该一次性入口创建 Logto 初始管理员与 seed M2M 应用，然后将 seed M2M 凭据填入 `.env`，执行：
 
 ```powershell
-docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml run --rm bootstrap
+docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml run --rm --no-deps bootstrap
 ```
 
 将输出文件中的 `OIDC_*` 与 `LOGTO_M2M_*` server-only 值写入 `.env` 后，再启动 BFF：

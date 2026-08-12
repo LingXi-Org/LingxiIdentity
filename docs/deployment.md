@@ -7,7 +7,7 @@ Copy-Item .env.example .env
 docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml up -d --build postgres logto
 ```
 
-The bootstrap overlay binds Admin Console to `127.0.0.1:3002` only. Create the initial Logto admin and seed M2M application once, then run the bootstrap command. Store its generated server credentials in `.env` or a deployment secret before starting `bff`.
+The bootstrap overlay binds Admin Console to `127.0.0.1:3002` only. Create the initial Logto admin and seed M2M application once, then run the bootstrap command after Logto is healthy. The bootstrap service has no Compose dependency on Logto, so it cannot indirectly start the already-completed seed/migration job. Store its generated server credentials in `.env` or a deployment secret before starting `bff`.
 
 ## Production
 
@@ -35,4 +35,4 @@ Minimal Nginx, Caddy and Kubernetes Ingress examples are in `docs/edge-proxy/`. 
 
 ## Upgrade
 
-Set `LOGTO_VERSION` to the tested upstream tag, recreate the stack, and verify `logto-migrate` completes before Logto starts. The migration service runs the official Logto seed/alteration commands; it never changes Logto source code.
+The deployment uses `ghcr.io/logto-io/logto:latest`. Recreate the stack and verify `logto-migrate` completes before Logto starts. The migration service runs the official Logto seed/alteration commands; it never changes Logto source code.
