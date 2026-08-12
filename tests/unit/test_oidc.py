@@ -9,7 +9,7 @@ import respx
 from cryptography.hazmat.primitives.asymmetric import rsa
 from httpx import Response
 
-from lingxi_identity.oidc import OidcDiscovery, OidcVerifier
+from lingxi_identity.oidc import OidcDiscovery, OidcVerifier, extract_bearer_token
 
 
 def verifier() -> OidcVerifier:
@@ -23,6 +23,19 @@ def verifier() -> OidcVerifier:
             jwks_uri="https://identity.example.com/oidc/keys",
         ),
     )
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["", "Basic token", "Bearer", "Bearer ", "Bearer token extra", "Bearer token,other"],
+)
+def test_extract_bearer_token_rejects_invalid_headers(header: str) -> None:
+    with pytest.raises(jwt.InvalidTokenError):
+        extract_bearer_token(header)
+
+
+def test_extract_bearer_token_accepts_case_insensitive_scheme() -> None:
+    assert extract_bearer_token("bEaReR access-token") == "access-token"
 
 
 def test_verify_claims_accepts_string_and_array_audience() -> None:
@@ -101,5 +114,6 @@ def test_jwks_cache_refreshes_after_key_rotation() -> None:
     second_token = jwt.encode(claims, second_private, algorithm="RS256", headers={"kid": "key-2"})
     target = verifier()
     assert target.verify(first_token).subject == "u1"
+    assert target.verify_authorization_header(f"Bearer {first_token}").subject == "u1"
     assert target.verify(second_token).subject == "u1"
     assert jwks.call_count == 2

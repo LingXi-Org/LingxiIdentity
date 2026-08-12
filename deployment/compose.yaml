@@ -140,6 +140,8 @@ services:
       LINGXI_CLAIMS_NAMESPACE: ${LINGXI_CLAIMS_NAMESPACE:-https://lingxi.dev/claims/}
       LINGXI_ADMIN_RESOURCE: ${LINGXI_ADMIN_RESOURCE:-https://id.lingxi.dev/admin}
       LINGXI_GRAPH_RESOURCE: ${LINGXI_GRAPH_RESOURCE:-https://graph.lingxi.dev/api}
+      LINGXI_LEARN_RESOURCE: ${LINGXI_LEARN_RESOURCE:-https://learn.lingxi.dev/api}
+      LINGXI_LEARN_WEB_REDIRECT_URI: ${LINGXI_LEARN_WEB_REDIRECT_URI:-}
       BOOTSTRAP_OUTPUT_FILE: ${BOOTSTRAP_OUTPUT_FILE:-/out/bootstrap.env}
     volumes:
       - ./secrets:/out

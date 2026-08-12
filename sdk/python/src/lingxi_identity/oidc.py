@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from threading import Lock
@@ -9,6 +10,20 @@ import httpx
 import jwt
 
 from .principal import Principal, principal_from_claims
+
+
+def extract_bearer_token(authorization: str) -> str:
+    """Extract one bearer token from an RFC 6750 Authorization header value."""
+    if not authorization:
+        raise jwt.InvalidTokenError("Authorization header is required")
+    parts = authorization.strip().split()
+    if (
+        len(parts) != 2
+        or parts[0].lower() != "bearer"
+        or not re.fullmatch(r"[A-Za-z0-9\-._~+/]+=*", parts[1])
+    ):
+        raise jwt.InvalidTokenError("Authorization header must be 'Bearer <token>'")
+    return parts[1]
 
 
 @dataclass(frozen=True)
@@ -127,6 +142,9 @@ class OidcVerifier:
         return principal_from_claims(
             self.decode(token, nonce=nonce), claims_namespace=self.claims_namespace
         )
+
+    def verify_authorization_header(self, authorization: str) -> Principal:
+        return self.verify(extract_bearer_token(authorization))
 
     def verify_claims(self, claims: dict[str, Any], *, nonce: str | None = None) -> Principal:
         if claims.get("iss") != self.issuer:

@@ -10,7 +10,7 @@ from .errors import (
     IdentityProviderUnavailableError,
 )
 from .models import AuditEvent, Organization, Page, Role, User
-from .oidc import OidcDiscovery, OidcVerifier
+from .oidc import OidcDiscovery, OidcVerifier, extract_bearer_token
 from .principal import Principal, principal_from_claims
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "OidcDiscovery",
     "OidcService",
     "OidcVerifier",
+    "extract_bearer_token",
     "Organization",
     "Page",
     "Principal",

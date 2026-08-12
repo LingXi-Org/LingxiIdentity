@@ -220,6 +220,25 @@ async def ensure_application(
     return json_object(await api.request("POST", "/api/applications", body=body))
 
 
+async def ensure_application_user_consent_scopes(
+    api: ManagementApi,
+    application_id: str,
+    *,
+    resource_scope_ids: list[str],
+    user_scopes: list[str],
+) -> None:
+    await api.request(
+        "POST",
+        f"/api/applications/{application_id}/user-consent-scopes",
+        body={
+            "organizationScopes": [],
+            "resourceScopes": resource_scope_ids,
+            "organizationResourceScopes": [],
+            "userScopes": user_scopes,
+        },
+    )
+
+
 async def ensure_m2m_management_role(api: ManagementApi, application_id: str) -> None:
     roles = await api.list_all("/api/roles")
     role = next((item for item in roles if item.get("name") == "Logto Management API access"), None)
@@ -322,6 +341,7 @@ async def run() -> dict[str, str]:
     manifest = BootstrapManifest(
         admin_resource=env("LINGXI_ADMIN_RESOURCE", "https://id.lingxi.dev/admin"),
         graph_resource=env("LINGXI_GRAPH_RESOURCE", "https://graph.lingxi.dev/api"),
+        learn_resource=env("LINGXI_LEARN_RESOURCE", "https://learn.lingxi.dev/api"),
         organization_name=env("BOOTSTRAP_ORGANIZATION_NAME", "Lingxi"),
         claims_namespace=env("LINGXI_CLAIMS_NAMESPACE", "https://lingxi.dev/claims/"),
     )
@@ -345,6 +365,13 @@ async def run() -> dict[str, str]:
         _graph_scopes = [
             await ensure_scope(api, graph_resource["id"], name, description)
             for name, description in manifest.graph_scopes
+        ]
+        learn_resource = await ensure_resource(
+            api, name="LingxiLearn API", indicator=manifest.learn_resource
+        )
+        learn_scopes = [
+            await ensure_scope(api, learn_resource["id"], name, description)
+            for name, description in manifest.learn_scopes
         ]
         admin_role = await ensure_global_role(
             api,
@@ -376,6 +403,25 @@ async def run() -> dict[str, str]:
             redirect_uri=f"{env('BFF_PUBLIC_URL', 'http://localhost:8080')}/auth/callback",
             post_logout_uri=env("BFF_PUBLIC_URL", "http://localhost:8080"),
         )
+        learn_redirect_uri = env("LINGXI_LEARN_WEB_REDIRECT_URI")
+        learn_web_app = await ensure_application(
+            api,
+            name="LingxiLearn Web",
+            app_type="SPA",
+            redirect_uri=learn_redirect_uri or None,
+        )
+        await ensure_application_user_consent_scopes(
+            api,
+            str(learn_web_app["id"]),
+            resource_scope_ids=[item["id"] for item in learn_scopes],
+            user_scopes=[
+                "profile",
+                "email",
+                "roles",
+                "urn:logto:scope:organizations",
+                "urn:logto:scope:organization_roles",
+            ],
+        )
         m2m_app = await ensure_application(
             api, name="Lingxi Admin BFF Management M2M", app_type="MachineToMachine"
         )
@@ -390,6 +436,8 @@ async def run() -> dict[str, str]:
             or str(m2m_app.get("secret", "")),
             "BOOTSTRAP_ADMIN_USER_ID": str(user.get("id", "")) if user else "",
             "GRAPH_RESOURCE": manifest.graph_resource,
+            "LINGXI_LEARN_OIDC_CLIENT_ID": str(learn_web_app.get("id", "")),
+            "LINGXI_LEARN_RESOURCE": manifest.learn_resource,
         }
         return output
     finally:
