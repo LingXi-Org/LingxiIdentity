@@ -57,6 +57,8 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,6 +121,8 @@ services:
     build:
       context: ..
       dockerfile: bootstrap/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     profiles: [bootstrap]
     environment:
       APP_ENV: ${APP_ENV:-development}

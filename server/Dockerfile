@@ -1,5 +1,7 @@
 FROM python:3.13-slim
 
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -9,8 +11,8 @@ COPY sdk/python /app/sdk/python
 COPY server /app/server
 COPY tests /app/tests
 
-RUN python -m pip install --no-cache-dir /app/sdk/python \
-    && python -m pip install --no-cache-dir /app/server
+RUN python -m pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" /app/sdk/python \
+    && python -m pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" /app/server
 
 RUN useradd --create-home --uid 10001 appuser \
     && chown -R appuser:appuser /app
