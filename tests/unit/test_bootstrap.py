@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from bootstrap.cli import ensure_application, ensure_application_user_consent_scopes
+from bootstrap.cli import ensure_application
 from bootstrap.manifest import BootstrapManifest
 from httpx import Response
 
@@ -30,24 +30,3 @@ async def test_public_spa_has_no_secret_configuration() -> None:
     assert body["type"] == "SPA"
     assert "secret" not in body
     assert body["oidcClientMetadata"]["redirectUris"] == []
-
-
-@pytest.mark.asyncio
-async def test_public_spa_consent_scopes_are_bound() -> None:
-    api = AsyncMock()
-
-    await ensure_application_user_consent_scopes(
-        api,
-        "learn-web",
-        resource_scope_ids=["read-id", "write-id"],
-        user_scopes=["profile", "email", "roles"],
-    )
-
-    request = api.request.call_args
-    assert request.args == ("POST", "/api/applications/learn-web/user-consent-scopes")
-    assert request.kwargs["body"] == {
-        "organizationScopes": [],
-        "resourceScopes": ["read-id", "write-id"],
-        "organizationResourceScopes": [],
-        "userScopes": ["profile", "email", "roles"],
-    }

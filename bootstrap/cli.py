@@ -220,25 +220,6 @@ async def ensure_application(
     return json_object(await api.request("POST", "/api/applications", body=body))
 
 
-async def ensure_application_user_consent_scopes(
-    api: ManagementApi,
-    application_id: str,
-    *,
-    resource_scope_ids: list[str],
-    user_scopes: list[str],
-) -> None:
-    await api.request(
-        "POST",
-        f"/api/applications/{application_id}/user-consent-scopes",
-        body={
-            "organizationScopes": [],
-            "resourceScopes": resource_scope_ids,
-            "organizationResourceScopes": [],
-            "userScopes": user_scopes,
-        },
-    )
-
-
 async def ensure_m2m_management_role(api: ManagementApi, application_id: str) -> None:
     roles = await api.list_all("/api/roles")
     role = next((item for item in roles if item.get("name") == "Logto Management API access"), None)
