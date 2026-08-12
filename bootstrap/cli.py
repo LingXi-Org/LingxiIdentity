@@ -369,10 +369,8 @@ async def run() -> dict[str, str]:
         learn_resource = await ensure_resource(
             api, name="LingxiLearn API", indicator=manifest.learn_resource
         )
-        learn_scopes = [
+        for name, description in manifest.learn_scopes:
             await ensure_scope(api, learn_resource["id"], name, description)
-            for name, description in manifest.learn_scopes
-        ]
         admin_role = await ensure_global_role(
             api,
             name="lingxi-admin",
@@ -409,18 +407,6 @@ async def run() -> dict[str, str]:
             name="LingxiLearn Web",
             app_type="SPA",
             redirect_uri=learn_redirect_uri or None,
-        )
-        await ensure_application_user_consent_scopes(
-            api,
-            str(learn_web_app["id"]),
-            resource_scope_ids=[item["id"] for item in learn_scopes],
-            user_scopes=[
-                "profile",
-                "email",
-                "roles",
-                "urn:logto:scope:organizations",
-                "urn:logto:scope:organization_roles",
-            ],
         )
         m2m_app = await ensure_application(
             api, name="Lingxi Admin BFF Management M2M", app_type="MachineToMachine"
