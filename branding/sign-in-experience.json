@@ -1,0 +1,14 @@
+{
+  "color": {
+    "primaryColor": "#2563EB",
+    "isDarkModeEnabled": true,
+    "darkPrimaryColor": "#60A5FA"
+  },
+  "languageInfo": {
+    "autoDetect": true,
+    "fallbackLanguage": "zh-CN"
+  },
+  "customContent": {
+    "/": "LingxiIdentity"
+  }
+}

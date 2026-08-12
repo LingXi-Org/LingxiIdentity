@@ -1,0 +1,7 @@
+identity.example.com {
+    reverse_proxy 127.0.0.1:3001
+}
+
+admin.example.com {
+    reverse_proxy 127.0.0.1:8080
+}

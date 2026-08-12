@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-labelledby="title">
+  <title>Lingxi</title>
+  <rect width="160" height="40" rx="10" fill="#0F172A"/>
+  <path d="M24 9h8v22h-8zM36 9h8v22h-8zM48 9h8v22h-8z" fill="#60A5FA"/>
+  <text x="70" y="27" fill="#F8FAFC" font-family="Arial,sans-serif" font-size="21" font-weight="700">Lingxi</text>
+</svg>

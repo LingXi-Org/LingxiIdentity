@@ -1,0 +1,154 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lingxi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-logto}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [lingxi]
+
+  logto-migrate:
+    image: ghcr.io/logto-io/logto:${LOGTO_VERSION:-v1.42.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
+      CI: "true"
+    command: >-
+      sh -c "npm run cli db seed -- --disable-admin-pwned-password-check
+      && npm run alteration deploy latest"
+    restart: "no"
+    networks: [lingxi]
+
+  logto:
+    image: ghcr.io/logto-io/logto:${LOGTO_VERSION:-v1.42.0}
+    depends_on:
+      logto-migrate:
+        condition: service_completed_successfully
+    environment:
+      DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
+      PORT: 3001
+      ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
+      TRUST_PROXY_HEADER: ${LOGTO_TRUST_PROXY_HEADER:-0}
+      ADMIN_DISABLE_LOCALHOST: ${LOGTO_ADMIN_DISABLE_LOCALHOST:-true}
+    ports:
+      - "${LOGTO_PORT:-3001}:3001"
+    volumes:
+      - logto_connectors:/etc/logto/packages/core/connectors
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [lingxi]
+
+  bff:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      logto:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      BFF_HOST: 0.0.0.0
+      BFF_PORT: 8080
+      BFF_PUBLIC_URL: ${BFF_PUBLIC_URL:-http://localhost:8080}
+      BFF_ALLOWED_ORIGINS: ${BFF_ALLOWED_ORIGINS:-http://localhost:8080}
+      BFF_ALLOWED_HOSTS: ${BFF_ALLOWED_HOSTS:-*}
+      LOGTO_PUBLIC_ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
+      LOGTO_INTERNAL_ENDPOINT: ${LOGTO_INTERNAL_ENDPOINT:-http://logto:3001}
+      LOGTO_ISSUER: ${LOGTO_ISSUER:-http://localhost:3001/oidc}
+      LOGTO_MANAGEMENT_API_INDICATOR: ${LOGTO_MANAGEMENT_API_INDICATOR:-https://default.logto.app/api}
+      LOGTO_M2M_CLIENT_ID: ${LOGTO_M2M_CLIENT_ID:-}
+      LOGTO_M2M_CLIENT_SECRET: ${LOGTO_M2M_CLIENT_SECRET:-}
+      LOGTO_M2M_CLIENT_SECRET_FILE: ${LOGTO_M2M_CLIENT_SECRET_FILE:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email offline_access roles urn:logto:scope:organizations urn:logto:scope:organization_roles}
+      OIDC_RESOURCE: ${OIDC_RESOURCE:-https://id.lingxi.dev/admin}
+      OIDC_REDIRECT_PATH: ${OIDC_REDIRECT_PATH:-/auth/callback}
+      LINGXI_DATABASE_URL: ${LINGXI_DATABASE_URL:-postgresql+asyncpg://lingxi:${POSTGRES_PASSWORD}@postgres:5432/lingxi}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lingxi_session}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:?SESSION_ENCRYPTION_KEY is required}
+      LINGXI_CLAIMS_NAMESPACE: ${LINGXI_CLAIMS_NAMESPACE:-https://lingxi.dev/claims/}
+    ports:
+      - "${BFF_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [lingxi]
+
+  smoke:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    profiles: [smoke]
+    depends_on:
+      bff:
+        condition: service_healthy
+      logto:
+        condition: service_healthy
+    environment:
+      SMOKE_BFF_URL: http://bff:8080
+      SMOKE_LOGTO_URL: http://logto:3001
+      SMOKE_EXPECT_ADMIN_DISABLED: ${SMOKE_EXPECT_ADMIN_DISABLED:-true}
+      SMOKE_ACCESS_TOKEN: ${SMOKE_ACCESS_TOKEN:-}
+      SMOKE_AUDIENCE: ${SMOKE_AUDIENCE:-https://graph.lingxi.dev/api}
+    command: ["python", "/app/tests/e2e/smoke.py"]
+    networks: [lingxi]
+
+  bootstrap:
+    build:
+      context: ..
+      dockerfile: bootstrap/Dockerfile
+    profiles: [bootstrap]
+    depends_on:
+      logto:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOGTO_PUBLIC_ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
+      LOGTO_INTERNAL_ENDPOINT: ${LOGTO_INTERNAL_ENDPOINT:-http://logto:3001}
+      LOGTO_MANAGEMENT_API_INDICATOR: ${LOGTO_MANAGEMENT_API_INDICATOR:-https://default.logto.app/api}
+      BOOTSTRAP_SEED_CLIENT_ID: ${BOOTSTRAP_SEED_CLIENT_ID:-}
+      BOOTSTRAP_SEED_CLIENT_SECRET: ${BOOTSTRAP_SEED_CLIENT_SECRET:-}
+      LOGTO_M2M_CLIENT_ID: ${LOGTO_M2M_CLIENT_ID:-}
+      LOGTO_M2M_CLIENT_SECRET: ${LOGTO_M2M_CLIENT_SECRET:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_ORGANIZATION_NAME: ${BOOTSTRAP_ORGANIZATION_NAME:-Lingxi}
+      LINGXI_CLAIMS_NAMESPACE: ${LINGXI_CLAIMS_NAMESPACE:-https://lingxi.dev/claims/}
+      LINGXI_ADMIN_RESOURCE: ${LINGXI_ADMIN_RESOURCE:-https://id.lingxi.dev/admin}
+      LINGXI_GRAPH_RESOURCE: ${LINGXI_GRAPH_RESOURCE:-https://graph.lingxi.dev/api}
+      BOOTSTRAP_OUTPUT_FILE: ${BOOTSTRAP_OUTPUT_FILE:-/out/bootstrap.env}
+    volumes:
+      - ./secrets:/out
+    command: ["python", "-m", "bootstrap.cli"]
+    networks: [lingxi]
+
+volumes:
+  postgres_data:
+  logto_connectors:
+
+networks:
+  lingxi:

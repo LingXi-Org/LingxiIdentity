@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lingxi-identity-workspace"
+version = "0.1.0"
+description = "Development tooling for LingxiIdentity"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.15,<2",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=1.0,<2",
+  "aiosqlite>=0.20,<1",
+  "respx>=0.22,<1",
+  "ruff>=0.9,<1",
+  "pip-audit>=2.7,<3",
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+asyncio_mode = "auto"
+pythonpath = ["sdk/python/src", "server/src", "bootstrap"]
+markers = [
+  "e2e: requires a running configured Logto stack",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["sdk/python/src", "server/src", "bootstrap", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["E501", "B008", "UP017", "UP037", "UP046"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true
+explicit_package_bases = true

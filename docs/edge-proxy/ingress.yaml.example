@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lingxi-identity
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-redirect-from: http://
+    nginx.ingress.kubernetes.io/proxy-redirect-to: https://
+spec:
+  tls:
+    - hosts: [identity.example.com, admin.example.com]
+      secretName: lingxiidentity-tls
+  rules:
+    - host: identity.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lingxi-logto
+                port: {number: 3001}
+    - host: admin.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lingxi-bff
+                port: {number: 8080}

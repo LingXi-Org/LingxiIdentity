@@ -1,0 +1,1 @@
+"""LingxiIdentity FastAPI management BFF."""

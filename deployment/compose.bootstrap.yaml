@@ -1,0 +1,9 @@
+services:
+  smoke:
+    environment:
+      SMOKE_EXPECT_ADMIN_DISABLED: "false"
+  logto:
+    environment:
+      ADMIN_DISABLE_LOCALHOST: "false"
+    ports:
+      - "127.0.0.1:${LOGTO_ADMIN_PORT:-3002}:3002"
