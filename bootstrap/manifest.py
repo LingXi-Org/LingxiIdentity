@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class BootstrapManifest:
     admin_resource: str = "https://id.lingxi.dev/admin"
     graph_resource: str = "https://graph.lingxi.dev/api"
+    learn_resource: str = "https://learn.lingxi.dev/api"
     organization_name: str = "Lingxi"
     claims_namespace: str = "https://lingxi.dev/claims/"
 
@@ -28,6 +29,13 @@ class BootstrapManifest:
         return (
             ("graph.read", "Read LingxiGraph data"),
             ("graph.write", "Write LingxiGraph data"),
+        )
+
+    @property
+    def learn_scopes(self) -> tuple[tuple[str, str], ...]:
+        return (
+            ("learn.read", "Read LingxiLearn data"),
+            ("learn.write", "Write LingxiLearn data"),
         )
 
     @property

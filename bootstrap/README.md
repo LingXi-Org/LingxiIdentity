@@ -17,7 +17,9 @@ BOOTSTRAP_ADMIN_PASSWORD=use-a-temporary-strong-password
 docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml run --rm bootstrap
 ```
 
-脚本会幂等创建 API resources/scopes、global role、organization role、默认组织及初始管理员 membership、BFF Web 应用、BFF Management M2M、claims customizer 与 branding，并把生成的 server-only credentials 写入 `BOOTSTRAP_OUTPUT_FILE` 指定文件。不要把该文件提交到 Git。
+脚本会幂等创建 API resources/scopes、global role、organization role、默认组织及初始管理员 membership、BFF Web 应用、LingxiLearn Public SPA、BFF Management M2M、claims customizer 与 branding，并把生成的 credentials 写入 `BOOTSTRAP_OUTPUT_FILE` 指定文件。Public SPA 只输出 client ID，不生成或输出 client secret。不要把该文件提交到 Git。
+
+如果要注册 LingxiLearn Web 的回调地址，请设置 `LINGXI_LEARN_WEB_REDIRECT_URI`。
 
 Logto 只在首次创建应用时返回 client secret；重复执行不会轮换已有 secret。重复 bootstrap 时请继续保留 `.env` 中已有的 `OIDC_CLIENT_SECRET` 和 `LOGTO_M2M_CLIENT_SECRET`。
 
