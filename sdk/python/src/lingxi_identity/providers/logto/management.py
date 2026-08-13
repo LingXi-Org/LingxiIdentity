@@ -188,6 +188,21 @@ class AsyncLogtoManagementAdapter:
     async def delete_user(self, user_id: str) -> None:
         await self._request("DELETE", f"/api/users/{user_id}")
 
+    async def list_user_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        payload = (
+            await self._request("GET", f"/api/users/{user_id}/sessions")
+        ).json()
+        return list(payload if isinstance(payload, list) else payload.get("sessions", []))
+
+    async def revoke_user_session(self, user_id: str, session_id: str) -> None:
+        await self._request("DELETE", f"/api/users/{user_id}/sessions/{session_id}")
+
+    async def revoke_all_user_sessions(self, user_id: str) -> None:
+        for session in await self.list_user_sessions(user_id):
+            session_id = session.get("id") or session.get("payload", {}).get("uid")
+            if session_id:
+                await self.revoke_user_session(user_id, str(session_id))
+
     async def set_user_roles(self, user_id: str, role_ids: list[str]) -> None:
         await self._request("PUT", f"/api/users/{user_id}/roles", json={"roleIds": role_ids})
 

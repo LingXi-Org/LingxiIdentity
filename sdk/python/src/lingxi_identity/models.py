@@ -30,8 +30,24 @@ class User(LingxiModel):
     suspended: bool = Field(default=False, alias="isSuspended")
     has_password: bool | None = Field(default=None, alias="hasPassword")
     custom_data: dict[str, Any] = Field(default_factory=dict, alias="customData")
+    profile: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime | None = Field(default=None, alias="createdAt")
     updated_at: datetime | None = Field(default=None, alias="updatedAt")
+
+
+class AccountSession(LingxiModel):
+    id: str
+    user_id: str | None = Field(default=None, alias="userId")
+    application_id: str | None = Field(default=None, alias="applicationId")
+    application_name: str | None = Field(default=None, alias="applicationName")
+    created_at: datetime | None = Field(default=None, alias="createdAt")
+    last_used_at: datetime | None = Field(default=None, alias="lastUsedAt")
+    is_current: bool = Field(default=False, alias="isCurrent")
+
+
+class VerificationRecord(LingxiModel):
+    verification_record_id: str = Field(alias="verificationRecordId")
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
 
 
 class Permission(LingxiModel):

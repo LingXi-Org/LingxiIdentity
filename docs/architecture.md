@@ -14,6 +14,8 @@ Logto is an external headless identity core. Lingxi owns the public abstraction,
 
 The BFF is the only component allowed to use the Management API M2M secret. Resource services validate access tokens locally with OIDC Discovery and JWKS and do not call the Management API for each request.
 
+Self-service profile, verification, password, email and device-session operations use the Logto Account/Verification APIs with the end-user access token held inside the encrypted BFF session. The BFF never handles password hashing or verification-code storage. The Logto Experience API powers the separately deployed Lingxi custom sign-in UI for registration and password recovery.
+
 ## Tenant model
 
 Logto Organization is the business tenant. An organization-scoped token must include `organization_id`; the SDK maps it to `Principal.tenant_id` and enforces path/claim equality in tenant-scoped BFF routes.

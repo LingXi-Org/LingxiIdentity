@@ -35,4 +35,5 @@ Minimal Nginx, Caddy and Kubernetes Ingress examples are in `docs/edge-proxy/`. 
 
 ## Upgrade
 
-The deployment uses `ghcr.io/logto-io/logto:latest`. Recreate the stack and verify `logto-migrate` completes before Logto starts. The migration service runs the official Logto seed/alteration commands; it never changes Logto source code.
+The deployment uses the pinned `${LOGTO_IMAGE}` value (default `ghcr.io/logto-io/logto:1.33.0`). Recreate the stack and verify `logto-migrate` completes before Logto starts. The migration service runs the official Logto seed/alteration commands; it never changes Logto source code.
+`LOGTO_IMAGE` defaults to the pinned `ghcr.io/logto-io/logto:1.33.0` image. Upgrade it deliberately after validating the Experience, Account and Verification API contracts.

@@ -7,6 +7,7 @@ from typing import Any
 import anyio
 
 from .models import AuditEvent, Organization, Page, Role, User
+from .providers.logto.account import AsyncLogtoAccountAdapter
 from .oidc import OidcDiscovery, OidcVerifier
 from .principal import Principal
 from .providers.logto.management import AsyncLogtoManagementAdapter
@@ -30,6 +31,9 @@ class _AsyncUsers:
 
     async def delete(self, user_id: str) -> None:
         return await self._a.delete_user(user_id)
+
+    async def revoke_all_sessions(self, user_id: str) -> None:
+        return await self._a.revoke_all_user_sessions(user_id)
 
     async def set_roles(self, user_id: str, role_ids: builtins.list[str]) -> None:
         return await self._a.set_user_roles(user_id, role_ids)
@@ -128,11 +132,56 @@ class AsyncIdentityClient:
         claims_namespace: str = "https://lingxi.dev/claims/",
     ) -> None:
         self._adapter = adapter
+        self._account_adapter = AsyncLogtoAccountAdapter(base_url=adapter.base_url)
         self.users = _AsyncUsers(adapter)
         self.roles = _AsyncRoles(adapter)
         self.organizations = _AsyncOrganizations(adapter)
         self.audit = _AsyncAudit(adapter)
         self.oidc = OidcService(claims_namespace=claims_namespace)
+
+    class _Account:
+        def __init__(self, adapter: AsyncLogtoAccountAdapter) -> None:
+            self._a = adapter
+
+        async def get_profile(self, access_token: str) -> User:
+            return await self._a.get_profile(access_token)
+
+        async def update_profile(
+            self, access_token: str, changes: dict[str, Any], *, verification_id: str | None = None
+        ) -> User:
+            return await self._a.update_profile(
+                access_token, changes, verification_id=verification_id
+            )
+
+        async def update_other_profile(self, access_token: str, changes: dict[str, Any]) -> dict[str, Any]:
+            return await self._a.update_other_profile(access_token, changes)
+
+        async def verify_password(self, access_token: str, password: str) -> Any:
+            return await self._a.verify_password(access_token, password)
+
+        async def send_verification_code(self, access_token: str, **kwargs: Any) -> Any:
+            return await self._a.send_verification_code(access_token, **kwargs)
+
+        async def verify_code(self, access_token: str, **kwargs: Any) -> Any:
+            return await self._a.verify_code(access_token, **kwargs)
+
+        async def update_password(self, access_token: str, **kwargs: Any) -> None:
+            await self._a.update_password(access_token, **kwargs)
+
+        async def update_email(self, access_token: str, **kwargs: Any) -> User:
+            return await self._a.update_email(access_token, **kwargs)
+
+        async def list_sessions(
+            self, access_token: str, *, verification_id: str | None = None
+        ) -> Any:
+            return await self._a.list_sessions(access_token, verification_id=verification_id)
+
+        async def revoke_session(self, access_token: str, session_id: str) -> None:
+            await self._a.revoke_session(access_token, session_id)
+
+    @property
+    def account(self) -> "AsyncIdentityClient._Account":
+        return self._Account(self._account_adapter)
 
     @classmethod
     def from_logto(
@@ -157,6 +206,7 @@ class AsyncIdentityClient:
         )
 
     async def aclose(self) -> None:
+        await self._account_adapter.aclose()
         await self._adapter.aclose()
 
 
@@ -183,6 +233,7 @@ class IdentityClient:
         self.roles = _SyncProxy(client.roles, self._run)
         self.organizations = _SyncProxy(client.organizations, self._run)
         self.audit = _SyncProxy(client.audit, self._run)
+        self.account = _SyncProxy(client.account, self._run)
         self.oidc = client.oidc
 
     @classmethod

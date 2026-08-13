@@ -18,7 +18,7 @@ services:
     networks: [lingxi]
 
   logto-migrate:
-    image: ghcr.io/logto-io/logto:latest
+    image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
     networks: [lingxi]
 
   logto:
-    image: ghcr.io/logto-io/logto:latest
+    image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
     depends_on:
       logto-migrate:
         condition: service_completed_successfully
@@ -75,6 +75,7 @@ services:
       BFF_ALLOWED_HOSTS: ${BFF_ALLOWED_HOSTS:-*}
       LOGTO_PUBLIC_ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
       LOGTO_INTERNAL_ENDPOINT: ${LOGTO_INTERNAL_ENDPOINT:-http://logto:3001}
+      LOGTO_IMAGE: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
       LOGTO_ISSUER: ${LOGTO_ISSUER:-http://localhost:3001/oidc}
       LOGTO_MANAGEMENT_API_INDICATOR: ${LOGTO_MANAGEMENT_API_INDICATOR:-https://default.logto.app/api}
       LOGTO_M2M_CLIENT_ID: ${LOGTO_M2M_CLIENT_ID:-}
@@ -89,6 +90,10 @@ services:
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lingxi_session}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      SESSION_REFRESH_SKEW_SECONDS: ${SESSION_REFRESH_SKEW_SECONDS:-120}
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
+      SESSION_COOKIE_PATH: ${SESSION_COOKIE_PATH:-/}
+      VERIFICATION_RECORD_TTL_SECONDS: ${VERIFICATION_RECORD_TTL_SECONDS:-600}
       SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:?SESSION_ENCRYPTION_KEY is required}
       LINGXI_CLAIMS_NAMESPACE: ${LINGXI_CLAIMS_NAMESPACE:-https://lingxi.dev/claims/}
     ports:

@@ -312,6 +312,32 @@ async def configure_branding(api: ManagementApi) -> None:
     await api.request("PATCH", "/api/sign-in-exp", body=current)
 
 
+async def configure_account_center(api: ManagementApi) -> None:
+    current = json_object(await api.request("GET", "/api/account-center"))
+    fields = dict(current.get("fields") or {})
+    fields.update(
+        {
+            "name": "Edit",
+            "avatar": "Edit",
+            "profile": "Edit",
+            "email": "Edit",
+            "password": "Edit",
+            "username": "Edit",
+            "customData": "Edit",
+            "session": "Edit",
+        }
+    )
+    body = {
+        "enabled": True,
+        "fields": fields,
+        "webauthnRelatedOrigins": current.get("webauthnRelatedOrigins", []),
+        "deleteAccountUrl": current.get("deleteAccountUrl"),
+        "customCss": current.get("customCss"),
+        "profileFields": current.get("profileFields"),
+    }
+    await api.request("PATCH", "/api/account-center", body=body)
+
+
 async def run() -> dict[str, str]:
     seed_id = env("BOOTSTRAP_SEED_CLIENT_ID") or env("LOGTO_M2M_CLIENT_ID")
     seed_secret = env("BOOTSTRAP_SEED_CLIENT_SECRET") or env("LOGTO_M2M_CLIENT_SECRET")
@@ -395,6 +421,7 @@ async def run() -> dict[str, str]:
         await ensure_m2m_management_role(api, m2m_app["id"])
         await configure_claims(api, manifest)
         await configure_branding(api)
+        await configure_account_center(api)
         output = {
             "OIDC_CLIENT_ID": env("OIDC_CLIENT_ID") or str(web_app.get("id", "")),
             "OIDC_CLIENT_SECRET": env("OIDC_CLIENT_SECRET") or str(web_app.get("secret", "")),

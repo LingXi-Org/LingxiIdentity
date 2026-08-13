@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -51,6 +52,7 @@ class OidcFlow:
                         jwks_uri=str(data["jwks_uri"]),
                         userinfo_endpoint=data.get("userinfo_endpoint"),
                         end_session_endpoint=data.get("end_session_endpoint"),
+                        revocation_endpoint=data.get("revocation_endpoint"),
                     )
                     return self._metadata
         raise RuntimeError("Logto OIDC discovery is unavailable")
@@ -60,7 +62,9 @@ class OidcFlow:
         public = urlsplit(self.settings.logto_public_endpoint)
         return urlunsplit((public.scheme, public.netloc, internal.path, internal.query, ""))
 
-    async def authorize(self, *, next_path: str = "/") -> tuple[str, str]:
+    async def authorize(
+        self, *, next_path: str = "/", extra_params: dict[str, str] | None = None
+    ) -> tuple[str, str]:
         metadata = await self.metadata()
         state = secrets.token_urlsafe(32)
         verifier = secrets.token_urlsafe(64)
@@ -89,6 +93,7 @@ class OidcFlow:
                 code_challenge=challenge,
                 code_challenge_method="S256",
                 resource=self.settings.oidc_resource,
+                **(extra_params or {}),
             )
         return authorization_url, signed
 
@@ -128,6 +133,24 @@ class OidcFlow:
             )
         return dict(token)
 
+    async def revoke(self, token: str, *, token_type_hint: str | None = None) -> None:
+        metadata = await self.metadata()
+        endpoint = metadata.revocation_endpoint
+        if not endpoint:
+            return
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(
+                endpoint,
+                data={
+                    "token": token,
+                    "token_type_hint": token_type_hint or "refresh_token",
+                    "client_id": self.settings.oidc_client_id,
+                    "client_secret": self.settings.oidc_client_secret,
+                },
+            )
+            if response.status_code >= 400:
+                raise RuntimeError("OIDC token revocation failed")
+
     def verifier(self, *, audience: str | None = None) -> OidcVerifier:
         if self._metadata is None:
             raise RuntimeError("OIDC metadata has not been loaded")
@@ -137,3 +160,16 @@ class OidcFlow:
             claims_namespace=self.settings.lingxi_claims_namespace,
             discovery=self._metadata,
         )
+
+    def decode_token_claims(self, token: str, *, audience: str | None = None) -> dict[str, Any]:
+        return self.verifier(audience=audience).decode(token)
+
+    @staticmethod
+    def token_expiry(claims: dict[str, Any]) -> datetime | None:
+        value = claims.get("exp")
+        if value is None:
+            return None
+        try:
+            return datetime.fromtimestamp(float(value), timezone.utc)
+        except (TypeError, ValueError, OverflowError):
+            return None

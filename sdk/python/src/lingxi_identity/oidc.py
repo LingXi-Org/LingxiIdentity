@@ -34,6 +34,7 @@ class OidcDiscovery:
     jwks_uri: str
     userinfo_endpoint: str | None = None
     end_session_endpoint: str | None = None
+    revocation_endpoint: str | None = None
 
     @classmethod
     def fetch(cls, issuer: str, *, timeout: float = 10.0) -> "OidcDiscovery":

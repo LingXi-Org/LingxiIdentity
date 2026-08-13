@@ -37,6 +37,8 @@ docker compose --env-file .env -f deployment/compose.yaml up -d --build
 
 ## SDK
 
+The BFF exposes the user lifecycle under `/auth` and `/api/v1/me`: login, registration, password recovery, CSRF-protected refresh/logout, profile and email/password changes, device-session revocation, and self-service suspension. See [docs/account-api.md](docs/account-api.md) for the request contract.
+
 ```python
 from lingxi_identity import AsyncIdentityClient, OidcVerifier
 

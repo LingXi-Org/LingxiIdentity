@@ -9,12 +9,13 @@ from .errors import (
     IdentityNotFoundError,
     IdentityProviderUnavailableError,
 )
-from .models import AuditEvent, Organization, Page, Role, User
+from .models import AccountSession, AuditEvent, Organization, Page, Role, User, VerificationRecord
 from .oidc import OidcDiscovery, OidcVerifier, extract_bearer_token
 from .principal import Principal, principal_from_claims
 
 __all__ = [
     "AsyncIdentityClient",
+    "AccountSession",
     "AuditEvent",
     "IdentityAuthenticationError",
     "IdentityAuthorizationError",
@@ -32,5 +33,6 @@ __all__ = [
     "Principal",
     "Role",
     "User",
+    "VerificationRecord",
     "principal_from_claims",
 ]

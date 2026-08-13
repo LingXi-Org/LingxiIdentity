@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     logto_public_endpoint: str = "http://localhost:3001"
     logto_internal_endpoint: str = "http://logto:3001"
+    logto_image: str = "ghcr.io/logto-io/logto:1.33.0"
     logto_issuer: str = "http://localhost:3001/oidc"
     logto_management_api_indicator: str = "https://default.logto.app/api"
     logto_m2m_client_id: str = ""
@@ -35,6 +36,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "lingxi_session"
     session_cookie_secure: bool = False
     session_ttl_seconds: int = 28800
+    session_refresh_skew_seconds: int = 120
+    session_cookie_domain: str | None = None
+    session_cookie_path: str = "/"
+    verification_record_ttl_seconds: int = 600
     session_encryption_key: str = ""
     lingxi_claims_namespace: str = "https://lingxi.dev/claims/"
 
@@ -83,6 +88,10 @@ class Settings(BaseSettings):
             raise ValueError("OIDC_CLIENT_ID is required")
         if not self.logto_m2m_client_id or not self.resolved_m2m_secret:
             raise ValueError("Logto Management M2M credentials are required")
+        if self.session_refresh_skew_seconds < 0:
+            raise ValueError("SESSION_REFRESH_SKEW_SECONDS must be non-negative")
+        if self.verification_record_ttl_seconds <= 0:
+            raise ValueError("VERIFICATION_RECORD_TTL_SECONDS must be positive")
 
 
 @lru_cache(maxsize=1)

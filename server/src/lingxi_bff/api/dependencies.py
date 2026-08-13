@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
+from datetime import datetime, timezone, timedelta
 from typing import Any, cast
 
 from fastapi import Depends, HTTPException, Request, status
@@ -31,7 +32,42 @@ async def get_session_context(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail={"code": "identity.session_expired"}
         )
-    return cast(SessionContext, context)
+    context = cast(SessionContext, context)
+    expiry = context.access_token_expires_at
+    skew = request.app.state.settings.session_refresh_skew_seconds
+    if expiry and expiry <= datetime.now(timezone.utc) + timedelta(seconds=skew):
+        if not context.refresh_token:
+            await request.app.state.session_manager.revoke(db, raw_id)
+            raise HTTPException(status_code=401, detail={"code": "identity.session_expired"})
+        try:
+            tokens = await request.app.state.oidc.refresh(context.refresh_token)
+            access_token = str(tokens["access_token"])
+            access_claims = request.app.state.oidc.verifier(
+                audience=request.app.state.settings.oidc_resource
+            ).decode(access_token)
+            id_token = tokens.get("id_token") or context.claims.get("id_token")
+            claims = {**context.claims, **access_claims}
+            refreshed = await request.app.state.session_manager.rotate(
+                db,
+                raw_id,
+                access_token=access_token,
+                refresh_token=tokens.get("refresh_token"),
+                id_token=str(id_token) if id_token else None,
+                claims=claims,
+                access_token_expires_at=request.app.state.oidc.token_expiry(access_claims),
+                refresh_token_expires_at=(
+                    datetime.now(timezone.utc) + timedelta(seconds=int(tokens["expires_in"]))
+                    if tokens.get("expires_in") and tokens.get("refresh_token")
+                    else context.refresh_token_expires_at
+                ),
+            )
+            if refreshed is None:
+                raise RuntimeError("session was revoked during refresh")
+            context = refreshed
+        except Exception as exc:
+            await request.app.state.session_manager.revoke(db, raw_id)
+            raise HTTPException(status_code=401, detail={"code": "identity.session_refresh_failed"}) from exc
+    return context
 
 
 async def get_principal(context: SessionContext = Depends(get_session_context)) -> Principal:
