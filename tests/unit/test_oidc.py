@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import pytest
 import respx
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from httpx import Response
 
 from lingxi_identity.oidc import OidcDiscovery, OidcVerifier, extract_bearer_token
@@ -71,6 +71,24 @@ def test_verify_claims_rejects_wrong_issuer() -> None:
                 "aud": "https://graph.example.com/api",
             }
         )
+
+
+@respx.mock
+def test_jwks_verifier_accepts_es384_tokens() -> None:
+    private_key = ec.generate_private_key(ec.SECP384R1())
+    public_jwk = json.loads(jwt.algorithms.ECAlgorithm.to_jwk(private_key.public_key()))
+    public_jwk["kid"] = "ec-key-1"
+    respx.get("https://identity.example.com/oidc/keys").mock(
+        return_value=Response(200, json={"keys": [public_jwk]})
+    )
+    claims = {
+        "iss": "https://identity.example.com/oidc",
+        "aud": "https://graph.example.com/api",
+        "sub": "u1",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    token = jwt.encode(claims, private_key, algorithm="ES384", headers={"kid": "ec-key-1"})
+    assert verifier().verify(token).subject == "u1"
 
 
 @respx.mock

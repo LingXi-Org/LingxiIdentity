@@ -113,7 +113,7 @@ class OidcVerifier:
         *,
         issuer: str,
         audience: str,
-        algorithms: tuple[str, ...] = ("RS256", "ES256"),
+        algorithms: tuple[str, ...] = ("RS256", "ES256", "ES384"),
         claims_namespace: str = "https://lingxi.dev/claims/",
         timeout: float = 10.0,
         discovery: OidcDiscovery | None = None,
