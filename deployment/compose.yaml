@@ -20,10 +20,8 @@ services:
 
   logto-migrate:
     image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
+    profiles: [migration]
     entrypoint: []
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
       CI: "true"
@@ -40,8 +38,8 @@ services:
     image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
     restart: unless-stopped
     depends_on:
-      logto-migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     environment:
       DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
       PORT: 3001

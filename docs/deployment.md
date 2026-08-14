@@ -31,7 +31,13 @@ docker compose --env-file .env -f deployment/compose.yaml up -d --build
 
 The `postgres`, `logto`, and `bff` services use `restart: unless-stopped`, so Docker
 will bring them back after a host or Docker daemon restart. The one-shot
-`logto-migrate` service is intentionally not configured for automatic restart.
+`logto-migrate` service is in the opt-in `migration` profile and is never started
+by the normal `up` command. Run it explicitly for an initial setup or deliberate
+Logto upgrade:
+
+```powershell
+docker compose --env-file .env -f deployment/compose.yaml --profile migration run --rm logto-migrate
+```
 
 Terminate TLS at the external ingress and forward `X-Forwarded-Proto: https`. Route the identity hostname to Logto port 3001 and the BFF hostname to port 8080. Logto port 3002 is bound to loopback only and must never be exposed by the ingress or firewall.
 
