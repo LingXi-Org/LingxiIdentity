@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
 
 from lingxi_bff.api.routes import _assert_tenant, login
+from lingxi_bff.settings import Settings
 from lingxi_identity import Principal
 
 
@@ -70,6 +71,11 @@ def test_tenant_path_mismatch_is_forbidden() -> None:
     with pytest.raises(HTTPException) as error:
         _assert_tenant(principal, "tenant-b")
     assert error.value.status_code == 403
+
+
+def test_session_cookie_path_always_covers_the_bff() -> None:
+    settings = Settings(session_cookie_path="/api")
+    assert settings.effective_session_cookie_path == "/"
 
 
 def test_global_admin_can_cross_tenant_for_admin_operations() -> None:

@@ -61,6 +61,13 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.bff_allowed_hosts.split(",") if item.strip()]
 
     @property
+    def effective_session_cookie_path(self) -> str:
+        # The BFF session is consumed by /auth, /api and the web app. A
+        # narrower configured path can make /api/v1/me succeed while the
+        # workspace route sees no session and redirects back to /login.
+        return "/"
+
+    @property
     def resolved_m2m_secret(self) -> str:
         if self.logto_m2m_client_secret:
             return self.logto_m2m_client_secret

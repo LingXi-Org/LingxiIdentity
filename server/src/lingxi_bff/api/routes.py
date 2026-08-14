@@ -180,7 +180,7 @@ async def callback(
         secure=request.app.state.settings.session_cookie_secure,
         samesite="lax",
         max_age=request.app.state.settings.session_ttl_seconds,
-        path=request.app.state.settings.session_cookie_path,
+        path=request.app.state.settings.effective_session_cookie_path,
         domain=request.app.state.settings.session_cookie_domain or None,
     )
     return response
@@ -258,7 +258,7 @@ async def logout(
     response = JSONResponse({"ok": True})
     response.delete_cookie(
         request.app.state.settings.session_cookie_name,
-        path=request.app.state.settings.session_cookie_path,
+        path=request.app.state.settings.effective_session_cookie_path,
         domain=request.app.state.settings.session_cookie_domain or None,
     )
     return response
@@ -396,7 +396,7 @@ async def deactivate_me(
     response = Response(status_code=204)
     response.delete_cookie(
         request.app.state.settings.session_cookie_name,
-        path=request.app.state.settings.session_cookie_path,
+        path=request.app.state.settings.effective_session_cookie_path,
         domain=request.app.state.settings.session_cookie_domain or None,
     )
     return response
