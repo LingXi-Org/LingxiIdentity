@@ -3,8 +3,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from datetime import datetime, timezone
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -92,7 +92,6 @@ class OidcFlow:
                 nonce=nonce,
                 code_challenge=challenge,
                 code_challenge_method="S256",
-                resource=self.settings.oidc_resource,
                 **(extra_params or {}),
             )
         return authorization_url, signed
@@ -116,7 +115,6 @@ class OidcFlow:
                 grant_type="authorization_code",
                 code=code,
                 code_verifier=state.code_verifier,
-                resource=self.settings.oidc_resource,
             )
         return dict(token)
 
@@ -129,7 +127,6 @@ class OidcFlow:
             token = await client.refresh_token(
                 metadata.token_endpoint,
                 refresh_token=refresh_token,
-                resource=self.settings.oidc_resource,
             )
         return dict(token)
 

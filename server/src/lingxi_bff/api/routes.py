@@ -145,16 +145,18 @@ async def callback(
     access_token = str(tokens["access_token"])
     try:
         id_claims = request.app.state.oidc.verifier().decode(id_token, nonce=oauth_state.nonce)
-        access_claims = request.app.state.oidc.verifier(
-            audience=request.app.state.settings.oidc_resource
-        ).decode(access_token)
-        if id_claims.get("sub") != access_claims.get("sub"):
-            raise ValueError("OIDC subject mismatch between ID token and access token")
-        claims = {**id_claims, **access_claims}
+        # Logto's Account API token is intentionally issued without a
+        # resource indicator and may be opaque, so the ID token is the
+        # authenticated source for the session principal.
+        claims = id_claims
     except Exception as exc:
         raise HTTPException(status_code=401, detail={"code": "identity.id_token_invalid"}) from exc
     expires_in = tokens.get("expires_in")
-    access_expiry = request.app.state.oidc.token_expiry(access_claims)
+    access_expiry = (
+        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+        if expires_in
+        else None
+    )
     refresh_expiry = (
         datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
         if expires_in and tokens.get("refresh_token")
@@ -209,10 +211,8 @@ async def refresh(
     try:
         tokens = await request.app.state.oidc.refresh(context.refresh_token)
         access_token = str(tokens["access_token"])
-        access_claims = request.app.state.oidc.verifier(
-            audience=request.app.state.settings.oidc_resource
-        ).decode(access_token)
-        claims = {**context.claims, **access_claims}
+        claims = context.claims
+        expires_in = tokens.get("expires_in")
         rotated = await request.app.state.session_manager.rotate(
             db,
             raw_id,
@@ -220,7 +220,11 @@ async def refresh(
             refresh_token=tokens.get("refresh_token"),
             id_token=tokens.get("id_token"),
             claims=claims,
-            access_token_expires_at=request.app.state.oidc.token_expiry(access_claims),
+            access_token_expires_at=(
+                datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+                if expires_in
+                else None
+            ),
             refresh_token_expires_at=(
                 datetime.now(timezone.utc) + timedelta(seconds=int(tokens["expires_in"]))
                 if tokens.get("expires_in") and tokens.get("refresh_token")

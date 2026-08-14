@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
 from fastapi import Depends, HTTPException, Request, status
@@ -42,11 +42,9 @@ async def get_session_context(
         try:
             tokens = await request.app.state.oidc.refresh(context.refresh_token)
             access_token = str(tokens["access_token"])
-            access_claims = request.app.state.oidc.verifier(
-                audience=request.app.state.settings.oidc_resource
-            ).decode(access_token)
-            id_token = tokens.get("id_token") or context.claims.get("id_token")
-            claims = {**context.claims, **access_claims}
+            id_token = tokens.get("id_token")
+            claims = context.claims
+            expires_in = tokens.get("expires_in")
             refreshed = await request.app.state.session_manager.rotate(
                 db,
                 raw_id,
@@ -54,7 +52,11 @@ async def get_session_context(
                 refresh_token=tokens.get("refresh_token"),
                 id_token=str(id_token) if id_token else None,
                 claims=claims,
-                access_token_expires_at=request.app.state.oidc.token_expiry(access_claims),
+                access_token_expires_at=(
+                    datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+                    if expires_in
+                    else None
+                ),
                 refresh_token_expires_at=(
                     datetime.now(timezone.utc) + timedelta(seconds=int(tokens["expires_in"]))
                     if tokens.get("expires_in") and tokens.get("refresh_token")

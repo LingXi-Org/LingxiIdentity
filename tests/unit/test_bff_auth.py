@@ -29,5 +29,6 @@ async def test_authorize_url_contains_pkce_without_client_secret() -> None:
     assert query["client_id"] == ["web-client"]
     assert query["code_challenge_method"] == ["S256"]
     assert query["state"]
+    assert "resource" not in query
     assert "server-only-secret" not in url
     assert flow.decode_state(signed_state).next_path == "/admin"

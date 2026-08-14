@@ -19,4 +19,4 @@ All endpoints below use the `lingxi_session` HttpOnly cookie. Call `GET /auth/cs
 | GET/DELETE | `/api/v1/me/sessions[/{id}]` | List or revoke Logto device sessions |
 | POST | `/api/v1/me/deactivate` | Suspend the current account and revoke all BFF sessions |
 
-The BFF proxies Account API and Verification API calls with the end-user access token. It does not implement password hashing, email delivery, reset tokens, or verification-code storage. Configure Logto email templates (`Register`, `ForgotPassword`, `UserPermissionValidation`, and `BindNewIdentifier`) and enable Account API through bootstrap.
+The BFF proxies Account API and Verification API calls with the end-user access token. The interactive login flow requests the Logto Account API token without a `resource` indicator, as required by Logto's Account API; the validated ID token supplies the BFF session principal. It does not implement password hashing, email delivery, reset tokens, or verification-code storage. Configure Logto email templates (`Register`, `ForgotPassword`, `UserPermissionValidation`, and `BindNewIdentifier`) and enable Account API through bootstrap.
