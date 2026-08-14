@@ -20,6 +20,7 @@ services:
 
   logto-migrate:
     image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
+    entrypoint: ["sh", "-c"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,8 +28,8 @@ services:
       DB_URL: postgresql://${POSTGRES_USER:-lingxi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-logto}
       CI: "true"
     command: >-
-      sh -c "npm run cli db seed -- --disable-admin-pwned-password-check
-      && npm run alteration deploy latest"
+      npm run cli db seed -- --disable-admin-pwned-password-check
+      && npm run alteration deploy latest
     restart: "no"
     networks: [lingxi]
 
