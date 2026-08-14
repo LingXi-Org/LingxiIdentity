@@ -144,7 +144,9 @@ class SessionManager:
             principal_from_claims(claims, claims_namespace=self.claims_namespace),
             claims,
             access_token,
-            refresh_token if refresh_token is not None else self._decrypt(record.encrypted_refresh_token),
+            refresh_token
+            if refresh_token is not None
+            else self._decrypt(record.encrypted_refresh_token),
             self._decrypt(record.encrypted_csrf_token) or "",
             access_token_expires_at,
             refresh_token_expires_at,

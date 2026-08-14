@@ -5,7 +5,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -159,7 +159,7 @@ class OidcFlow:
         )
 
     def decode_token_claims(self, token: str, *, audience: str | None = None) -> dict[str, Any]:
-        return self.verifier(audience=audience).decode(token)
+        return cast(dict[str, Any], self.verifier(audience=audience).decode(token))
 
     @staticmethod
     def token_expiry(claims: dict[str, Any]) -> datetime | None:

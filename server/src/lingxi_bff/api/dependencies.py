@@ -65,10 +65,12 @@ async def get_session_context(
             )
             if refreshed is None:
                 raise RuntimeError("session was revoked during refresh")
-            context = refreshed
+            context = cast(SessionContext, refreshed)
         except Exception as exc:
             await request.app.state.session_manager.revoke(db, raw_id)
-            raise HTTPException(status_code=401, detail={"code": "identity.session_refresh_failed"}) from exc
+            raise HTTPException(
+                status_code=401, detail={"code": "identity.session_refresh_failed"}
+            ) from exc
     return context
 
 

@@ -23,8 +23,12 @@ class BffSession(Base):
     encrypted_access_token: Mapped[str] = mapped_column(Text, nullable=False)
     encrypted_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     encrypted_id_token: Mapped[str | None] = mapped_column(Text, nullable=True)
-    access_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     token_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     claims: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     csrf_hash: Mapped[str] = mapped_column(String(64), nullable=False)

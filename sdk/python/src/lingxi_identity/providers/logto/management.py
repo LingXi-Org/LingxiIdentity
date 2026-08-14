@@ -189,9 +189,7 @@ class AsyncLogtoManagementAdapter:
         await self._request("DELETE", f"/api/users/{user_id}")
 
     async def list_user_sessions(self, user_id: str) -> list[dict[str, Any]]:
-        payload = (
-            await self._request("GET", f"/api/users/{user_id}/sessions")
-        ).json()
+        payload = (await self._request("GET", f"/api/users/{user_id}/sessions")).json()
         return list(payload if isinstance(payload, list) else payload.get("sessions", []))
 
     async def revoke_user_session(self, user_id: str, session_id: str) -> None:

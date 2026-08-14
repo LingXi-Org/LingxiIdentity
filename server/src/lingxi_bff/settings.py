@@ -84,7 +84,9 @@ class Settings(BaseSettings):
         return self.app_env.lower() in {"prod", "production"}
 
     def validate_runtime(self) -> None:
-        if self.bff_web_public_url and not self.bff_web_public_url.startswith(("http://", "https://")):
+        if self.bff_web_public_url and not self.bff_web_public_url.startswith(
+            ("http://", "https://")
+        ):
             raise ValueError("BFF_WEB_PUBLIC_URL must be an absolute HTTP(S) URL")
         if self.is_production:
             if not self.session_cookie_secure:

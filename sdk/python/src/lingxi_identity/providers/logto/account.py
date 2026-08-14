@@ -84,7 +84,9 @@ class AsyncLogtoAccountAdapter:
         )
         return User.model_validate(response.json())
 
-    async def update_other_profile(self, access_token: str, changes: dict[str, Any]) -> dict[str, Any]:
+    async def update_other_profile(
+        self, access_token: str, changes: dict[str, Any]
+    ) -> dict[str, Any]:
         response = await self._request(
             "PATCH", "/api/my-account/profile", access_token, json=changes
         )
@@ -168,7 +170,11 @@ class AsyncLogtoAccountAdapter:
             "GET", "/api/my-account/sessions", access_token, headers=headers
         )
         payload = response.json()
-        items = payload if isinstance(payload, list) else payload.get("sessions", payload.get("data", []))
+        items = (
+            payload
+            if isinstance(payload, list)
+            else payload.get("sessions", payload.get("data", []))
+        )
         normalized: list[AccountSession] = []
         for item in items:
             if "id" in item:
@@ -188,6 +194,4 @@ class AsyncLogtoAccountAdapter:
         return normalized
 
     async def revoke_session(self, access_token: str, session_id: str) -> None:
-        await self._request(
-            "DELETE", f"/api/my-account/sessions/{session_id}", access_token
-        )
+        await self._request("DELETE", f"/api/my-account/sessions/{session_id}", access_token)

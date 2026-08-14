@@ -7,9 +7,9 @@ from typing import Any
 import anyio
 
 from .models import AuditEvent, Organization, Page, Role, User
-from .providers.logto.account import AsyncLogtoAccountAdapter
 from .oidc import OidcDiscovery, OidcVerifier
 from .principal import Principal
+from .providers.logto.account import AsyncLogtoAccountAdapter
 from .providers.logto.management import AsyncLogtoManagementAdapter
 
 
@@ -153,7 +153,9 @@ class AsyncIdentityClient:
                 access_token, changes, verification_id=verification_id
             )
 
-        async def update_other_profile(self, access_token: str, changes: dict[str, Any]) -> dict[str, Any]:
+        async def update_other_profile(
+            self, access_token: str, changes: dict[str, Any]
+        ) -> dict[str, Any]:
             return await self._a.update_other_profile(access_token, changes)
 
         async def verify_password(self, access_token: str, password: str) -> Any:

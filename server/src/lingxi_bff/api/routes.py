@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -54,7 +54,9 @@ async def _revoke_subject(request: Request, db: AsyncSession, subject: str) -> N
 
 
 def _safe_next_path(value: str) -> str:
-    return value if value.startswith("/") and not value.startswith("//") and "\\" not in value else "/"
+    return (
+        value if value.startswith("/") and not value.startswith("//") and "\\" not in value else "/"
+    )
 
 
 def _resolve_next_url(request: Request, value: str) -> str:
@@ -153,9 +155,7 @@ async def callback(
         raise HTTPException(status_code=401, detail={"code": "identity.id_token_invalid"}) from exc
     expires_in = tokens.get("expires_in")
     access_expiry = (
-        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
-        if expires_in
-        else None
+        datetime.now(timezone.utc) + timedelta(seconds=int(expires_in)) if expires_in else None
     )
     refresh_expiry = (
         datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
@@ -171,9 +171,9 @@ async def callback(
         access_token_expires_at=access_expiry,
         refresh_token_expires_at=refresh_expiry,
     )
-    response = RedirectResponse(oauth_state.next_path, status_code=302)
-    _clear_oauth_state_cookie(response, request)
-    response.set_cookie(
+    redirect_response: Response = RedirectResponse(oauth_state.next_path, status_code=302)
+    _clear_oauth_state_cookie(redirect_response, request)
+    redirect_response.set_cookie(
         request.app.state.settings.session_cookie_name,
         context.session_id,
         httponly=True,
@@ -183,7 +183,7 @@ async def callback(
         path=request.app.state.settings.effective_session_cookie_path,
         domain=request.app.state.settings.session_cookie_domain or None,
     )
-    return response
+    return redirect_response
 
 
 @auth_router.get("/csrf", response_model=CsrfResponse)
@@ -236,7 +236,9 @@ async def refresh(
         return {"ok": True, "expiresAt": rotated.access_token_expires_at}
     except Exception as exc:
         await request.app.state.session_manager.revoke(db, raw_id)
-        raise HTTPException(status_code=401, detail={"code": "identity.session_refresh_failed"}) from exc
+        raise HTTPException(
+            status_code=401, detail={"code": "identity.session_refresh_failed"}
+        ) from exc
 
 
 @auth_router.post("/logout", dependencies=[Depends(validate_csrf)])
@@ -248,7 +250,10 @@ async def logout(
     raw_id = request.cookies.get(request.app.state.settings.session_cookie_name)
     if raw_id:
         await request.app.state.session_manager.revoke(db, raw_id)
-    for token, hint in ((context.refresh_token, "refresh_token"), (context.access_token, "access_token")):
+    for token, hint in (
+        (context.refresh_token, "refresh_token"),
+        (context.access_token, "access_token"),
+    ):
         if token:
             try:
                 await request.app.state.oidc.revoke(token, token_type_hint=hint)
@@ -297,8 +302,10 @@ async def verify_me_password(
     context: SessionContext = Depends(get_session_context),
     client: AsyncIdentityClient = Depends(get_identity),
 ) -> dict[str, Any]:
-    record = await client.account.verify_password(context.access_token, body.password.get_secret_value())
-    return record.model_dump(by_alias=True)
+    record = await client.account.verify_password(
+        context.access_token, body.password.get_secret_value()
+    )
+    return cast(dict[str, Any], record.model_dump(by_alias=True))
 
 
 @api_router.post("/me/verifications/email", dependencies=[Depends(validate_csrf)])
@@ -312,7 +319,7 @@ async def send_me_email_code(
         identifier_type=body.identifier_type,
         identifier=body.identifier,
     )
-    return record.model_dump(by_alias=True)
+    return cast(dict[str, Any], record.model_dump(by_alias=True))
 
 
 @api_router.post("/me/verifications/email/verify", dependencies=[Depends(validate_csrf)])
@@ -328,7 +335,7 @@ async def verify_me_email_code(
         verification_id=body.verification_id,
         code=body.code,
     )
-    return record.model_dump(by_alias=True)
+    return cast(dict[str, Any], record.model_dump(by_alias=True))
 
 
 @api_router.patch("/me/email", dependencies=[Depends(validate_csrf)])
@@ -372,7 +379,9 @@ async def list_me_sessions(
     return [SessionItem.model_validate(item.model_dump(by_alias=True)) for item in sessions]
 
 
-@api_router.delete("/me/sessions/{session_id}", status_code=204, dependencies=[Depends(validate_csrf)])
+@api_router.delete(
+    "/me/sessions/{session_id}", status_code=204, dependencies=[Depends(validate_csrf)]
+)
 async def revoke_me_session(
     session_id: str,
     request: Request,
@@ -470,9 +479,7 @@ async def suspend_user(
     "/users/{user_id}/restore",
     dependencies=[Depends(require_permission("identity.users.write")), Depends(validate_csrf)],
 )
-async def restore_user(
-    user_id: str, client: AsyncIdentityClient = Depends(get_identity)
-) -> User:
+async def restore_user(user_id: str, client: AsyncIdentityClient = Depends(get_identity)) -> User:
     return await client.users.update(user_id, {"isSuspended": False})
 
 

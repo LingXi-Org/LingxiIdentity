@@ -16,7 +16,11 @@ def upgrade() -> None:
         "bff_sessions",
         sa.Column("token_updated_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.execute(sa.text("UPDATE bff_sessions SET token_updated_at = created_at WHERE token_updated_at IS NULL"))
+    op.execute(
+        sa.text(
+            "UPDATE bff_sessions SET token_updated_at = created_at WHERE token_updated_at IS NULL"
+        )
+    )
     op.alter_column("bff_sessions", "token_updated_at", nullable=False)
 
 
