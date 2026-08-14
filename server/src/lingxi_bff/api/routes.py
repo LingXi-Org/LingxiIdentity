@@ -38,9 +38,9 @@ from .schemas import (
     RoleAssignment,
     RoleCreate,
     RolePatch,
+    SessionItem,
     UserCreate,
     UserPatch,
-    SessionItem,
     VerificationCodeRequest,
     VerificationCodeSend,
 )
@@ -57,21 +57,36 @@ def _safe_next_path(value: str) -> str:
     return value if value.startswith("/") and not value.startswith("//") and "\\" not in value else "/"
 
 
+def _oauth_state_cookie_kwargs(request: Request) -> dict[str, Any]:
+    settings = request.app.state.settings
+    return {
+        "httponly": True,
+        "secure": settings.session_cookie_secure,
+        "samesite": "lax",
+        "max_age": 600,
+        "path": getattr(settings, "oidc_redirect_path", "/auth/callback"),
+        # The state cookie must have the same domain as the session cookie so
+        # it survives a cross-subdomain OIDC redirect in production.
+        "domain": getattr(settings, "session_cookie_domain", None) or None,
+    }
+
+
+def _clear_oauth_state_cookie(response: Response, request: Request) -> None:
+    settings = request.app.state.settings
+    response.delete_cookie(
+        "lingxi_oauth_state",
+        path=getattr(settings, "oidc_redirect_path", "/auth/callback"),
+        domain=getattr(settings, "session_cookie_domain", None) or None,
+    )
+
+
 @auth_router.get("/login")
 async def login(request: Request, next_path: str = "/") -> Response:
     url, state = await request.app.state.oidc.authorize(
         next_path=_safe_next_path(next_path)
     )
     response = RedirectResponse(url, status_code=302)
-    response.set_cookie(
-        "lingxi_oauth_state",
-        state,
-        httponly=True,
-        secure=request.app.state.settings.session_cookie_secure,
-        samesite="lax",
-        max_age=600,
-        path=getattr(request.app.state.settings, "oidc_redirect_path", "/auth/callback"),
-    )
+    response.set_cookie("lingxi_oauth_state", state, **_oauth_state_cookie_kwargs(request))
     return response
 
 
@@ -82,15 +97,7 @@ async def _auth_entry(request: Request, *, first_screen: str, next_path: str) ->
         extra_params={"first_screen": first_screen},
     )
     response = RedirectResponse(url, status_code=302)
-    response.set_cookie(
-        "lingxi_oauth_state",
-        state,
-        httponly=True,
-        secure=request.app.state.settings.session_cookie_secure,
-        samesite="lax",
-        max_age=600,
-        path=getattr(request.app.state.settings, "oidc_redirect_path", "/auth/callback"),
-    )
+    response.set_cookie("lingxi_oauth_state", state, **_oauth_state_cookie_kwargs(request))
     return response
 
 
@@ -115,11 +122,11 @@ async def callback(
         oauth_state = request.app.state.oidc.decode_state(signed_state)
     except ValueError:
         response = JSONResponse({"code": "identity.oauth_state_invalid"}, status_code=400)
-        response.delete_cookie("lingxi_oauth_state", path=request.app.state.settings.oidc_redirect_path)
+        _clear_oauth_state_cookie(response, request)
         return response
     if state != oauth_state.state:
         response = JSONResponse({"code": "identity.oauth_state_mismatch"}, status_code=400)
-        response.delete_cookie("lingxi_oauth_state", path=request.app.state.settings.oidc_redirect_path)
+        _clear_oauth_state_cookie(response, request)
         return response
     tokens = await request.app.state.oidc.exchange(code=code, state=oauth_state)
     id_token = tokens.get("id_token")
@@ -153,7 +160,7 @@ async def callback(
         refresh_token_expires_at=refresh_expiry,
     )
     response = RedirectResponse(oauth_state.next_path, status_code=302)
-    response.delete_cookie("lingxi_oauth_state", path=request.app.state.settings.oidc_redirect_path)
+    _clear_oauth_state_cookie(response, request)
     response.set_cookie(
         request.app.state.settings.session_cookie_name,
         context.session_id,

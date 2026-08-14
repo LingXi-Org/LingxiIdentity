@@ -30,7 +30,10 @@ def request_with_app(app: FastAPI) -> Request:
 @pytest.mark.asyncio
 async def test_login_cookie_is_secure_and_httponly() -> None:
     app = FastAPI()
-    app.state.settings = SimpleNamespace(session_cookie_secure=True)
+    app.state.settings = SimpleNamespace(
+        session_cookie_secure=True,
+        session_cookie_domain=".lingxilearn.cn",
+    )
     app.state.oidc = SimpleNamespace(
         authorize=AsyncMock(return_value=("https://id/login", "signed"))
     )
@@ -39,6 +42,7 @@ async def test_login_cookie_is_secure_and_httponly() -> None:
     assert "HttpOnly" in cookie
     assert "Secure" in cookie
     assert "SameSite=lax" in cookie
+    assert "Domain=.lingxilearn.cn" in cookie
 
 
 def test_tenant_path_mismatch_is_forbidden() -> None:
