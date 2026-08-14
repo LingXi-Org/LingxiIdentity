@@ -18,10 +18,20 @@ APP_ENV=production
 LOGTO_PUBLIC_ENDPOINT=https://identity.example.com
 LOGTO_ISSUER=https://identity.example.com/oidc
 BFF_PUBLIC_URL=https://admin.example.com
+BFF_WEB_PUBLIC_URL=https://www.example.com
+BFF_DEFAULT_NEXT_PATH=/workspace/lingxi/home/
 BFF_ALLOWED_HOSTS=admin.example.com
 SESSION_COOKIE_SECURE=true
 LOGTO_TRUST_PROXY_HEADER=1
 ```
+
+`BFF_PUBLIC_URL` is the identity service origin and must remain the OIDC
+callback origin. `BFF_WEB_PUBLIC_URL` is the public web application origin;
+after a successful BFF login, relative `next_path` values are redirected there.
+For example, with `BFF_WEB_PUBLIC_URL=https://lingxilearn.cn` and
+`BFF_DEFAULT_NEXT_PATH=/workspace/lingxi/home/`, an ordinary `/auth/login`
+redirects to `https://lingxilearn.cn/workspace/lingxi/home/`. Visiting the web
+application home page directly is unaffected.
 
 Run only:
 

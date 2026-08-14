@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     bff_host: str = "0.0.0.0"
     bff_port: int = 8080
     bff_public_url: str = "http://localhost:8080"
+    bff_web_public_url: str = ""
+    bff_default_next_path: str = "/"
     bff_allowed_origins: str = "http://localhost:8080"
     bff_allowed_hosts: str = "*"
 
@@ -75,6 +77,8 @@ class Settings(BaseSettings):
         return self.app_env.lower() in {"prod", "production"}
 
     def validate_runtime(self) -> None:
+        if self.bff_web_public_url and not self.bff_web_public_url.startswith(("http://", "https://")):
+            raise ValueError("BFF_WEB_PUBLIC_URL must be an absolute HTTP(S) URL")
         if self.is_production:
             if not self.session_cookie_secure:
                 raise ValueError("SESSION_COOKIE_SECURE must be true in production")
@@ -82,6 +86,8 @@ class Settings(BaseSettings):
                 raise ValueError("BFF_PUBLIC_URL must use HTTPS in production")
             if not self.logto_public_endpoint.startswith("https://"):
                 raise ValueError("LOGTO_PUBLIC_ENDPOINT must use HTTPS in production")
+            if self.bff_web_public_url and not self.bff_web_public_url.startswith("https://"):
+                raise ValueError("BFF_WEB_PUBLIC_URL must use HTTPS in production")
         if not self.session_encryption_key:
             raise ValueError("SESSION_ENCRYPTION_KEY is required")
         if not self.oidc_client_id:

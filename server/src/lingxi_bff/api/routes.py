@@ -57,6 +57,15 @@ def _safe_next_path(value: str) -> str:
     return value if value.startswith("/") and not value.startswith("//") and "\\" not in value else "/"
 
 
+def _resolve_next_url(request: Request, value: str) -> str:
+    settings = request.app.state.settings
+    next_path = _safe_next_path(value)
+    if next_path == "/":
+        next_path = _safe_next_path(getattr(settings, "bff_default_next_path", "/"))
+    web_origin = getattr(settings, "bff_web_public_url", "").rstrip("/")
+    return f"{web_origin}{next_path}" if web_origin else next_path
+
+
 def _oauth_state_cookie_kwargs(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
@@ -83,7 +92,7 @@ def _clear_oauth_state_cookie(response: Response, request: Request) -> None:
 @auth_router.get("/login")
 async def login(request: Request, next_path: str = "/") -> Response:
     url, state = await request.app.state.oidc.authorize(
-        next_path=_safe_next_path(next_path)
+        next_path=_resolve_next_url(request, next_path)
     )
     response = RedirectResponse(url, status_code=302)
     response.set_cookie("lingxi_oauth_state", state, **_oauth_state_cookie_kwargs(request))
@@ -92,8 +101,9 @@ async def login(request: Request, next_path: str = "/") -> Response:
 
 async def _auth_entry(request: Request, *, first_screen: str, next_path: str) -> Response:
     url, state = await request.app.state.oidc.authorize(
-        next_path=_safe_next_path(next_path),
-        # Only relative paths are carried through the signed OAuth state.
+        next_path=_resolve_next_url(request, next_path),
+        # User-controlled paths stay relative; the optional web origin comes
+        # from trusted server configuration.
         extra_params={"first_screen": first_screen},
     )
     response = RedirectResponse(url, status_code=302)
