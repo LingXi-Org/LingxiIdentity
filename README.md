@@ -33,6 +33,8 @@ docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.
 docker compose --env-file .env -f deployment/compose.yaml up -d --build
 ```
 
+核心服务已配置 `restart: unless-stopped`，服务器或 Docker 重启后会自动恢复；直接在项目根目录执行上面这一行即可启动。
+
 生产配置不会发布 3002，并通过 `ADMIN_DISABLE_LOCALHOST=true` 且不设置 `ADMIN_ENDPOINT` 完全关闭 Logto Admin Console。生产 HTTPS 由外部反向代理提供，详见 [docs/deployment.md](docs/deployment.md)。
 
 ## SDK
