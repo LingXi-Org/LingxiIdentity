@@ -109,6 +109,15 @@ class Settings(BaseSettings):
         return self.app_env.lower() in {"prod", "production"}
 
     def validate_runtime(self) -> None:
+        # Routes historically consume session_cookie_domain directly. Resolve
+        # the safe shared parent once during startup so both the short-lived
+        # OAuth state cookie and the final session cookie survive the
+        # lingxilearn.cn -> identity.lingxilearn.cn -> lingxilearn.cn flow.
+        if not self.session_cookie_domain:
+            self.session_cookie_domain = self.effective_session_cookie_domain
+        elif self.session_cookie_domain:
+            self.session_cookie_domain = self.session_cookie_domain.lstrip(".")
+
         if self.bff_web_public_url and not self.bff_web_public_url.startswith(
             ("http://", "https://")
         ):
