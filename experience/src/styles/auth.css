@@ -40,7 +40,9 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 .social-button { height: 42px; border: 1px solid #d6d6d6; border-radius: 9px; background: #fff; color: #303030; font-size: 13px; font-weight: 600; }
 .social-button:hover { border-color: var(--primary); }
 .auth-footer { margin-top: 24px; text-align: center; color: #777; font-size: 13px; }
-.legal { margin: 17px 0 0; color: #9b9b9b; font-size: 11px; text-align: center; }
+.legal { margin: 17px 0 0; color: #9b9b9b; font-size: 11px; text-align: center; line-height: 1.6; }
+.legal a { color: #666; text-decoration: underline; text-underline-offset: 2px; }
+.legal a:hover { color: #171717; }
 .loading-panel { display: flex; justify-content: center; align-items: center; gap: 9px; min-height: 120px; color: #777; font-size: 13px; }
 .spinner { width: 15px; height: 15px; display: inline-block; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
