@@ -42,12 +42,12 @@ export const normalizeExperienceError = (
   fallback = '操作失败，请稍后重试。'
 ): UIError => {
   if (error && typeof error === 'object' && 'code' in error) {
-    const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
+    const candidate = error as { code?: unknown; status?: unknown };
     const code = typeof candidate.code === 'string' ? candidate.code : 'experience.unknown_error';
     const known = messages[code];
     return {
       code,
-      message: known?.message ?? (typeof candidate.message === 'string' ? candidate.message : fallback),
+      message: known?.message ?? fallback,
       status: typeof candidate.status === 'number' ? candidate.status : undefined,
       field: known?.field,
     };
