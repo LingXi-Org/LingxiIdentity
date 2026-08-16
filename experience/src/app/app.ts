@@ -186,7 +186,9 @@ const renderRegister = () => {
       render();
       return;
     }
-    const passwordPolicyMessage = passwordRequired ? passwordPolicyError(state.settings?.passwordPolicy, password) : undefined;
+    const passwordPolicyMessage = passwordRequired
+      ? passwordPolicyError(state.settings?.passwordPolicy, password ?? '')
+      : undefined;
     if (passwordPolicyMessage) {
       state.error = { code: 'guard.invalid_input', message: passwordPolicyMessage, field: 'password' };
       render();
@@ -219,13 +221,13 @@ const renderRegister = () => {
 };
 
 const renderRegisterVerify = () => {
+  const passwordRequired = state.settings?.signUp?.password !== false;
   const content = `
     <form id="register-verify-form" class="auth-form" novalidate>
       <p class="step-note">We sent a verification code to <strong>${escapeHtml(state.identifier?.value)}</strong>.</p>
       <label for="code">Verification code</label>
       <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required />
-      <label for="password">Password</label>
-      <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required /><button type="button" class="password-toggle" data-target="password">Show</button></div>
+      ${passwordRequired ? '<label for="password">Password</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required /><button type="button" class="password-toggle" data-target="password">Show</button></div>' : ''}
       ${errorHtml()}
       ${button('Verify and create account', state.busy)}
     </form>`;
@@ -234,13 +236,19 @@ const renderRegisterVerify = () => {
     event.preventDefault();
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const code = String(form.get('code') ?? '').trim();
-    const password = String(form.get('password') ?? '');
-    if (!code || !password || !state.identifier || !state.verificationId) {
-      state.error = { code: 'guard.invalid_input', message: 'Enter the code and choose a password.', field: 'form' };
+    const password = passwordRequired ? String(form.get('password') ?? '') : undefined;
+    if (!code || !state.identifier || !state.verificationId || (passwordRequired && !password)) {
+      state.error = {
+        code: 'guard.invalid_input',
+        message: passwordRequired ? 'Enter the code and choose a password.' : 'Enter the verification code.',
+        field: 'form',
+      };
       render();
       return;
     }
-    const passwordPolicyMessage = passwordPolicyError(state.settings?.passwordPolicy, password);
+    const passwordPolicyMessage = passwordRequired
+      ? passwordPolicyError(state.settings?.passwordPolicy, password ?? '')
+      : undefined;
     if (passwordPolicyMessage) {
       state.error = { code: 'guard.invalid_input', message: passwordPolicyMessage, field: 'password' };
       render();
@@ -381,7 +389,11 @@ const renderCallback = async () => {
     return;
   }
   try {
-    submitResult(await api.completeSocialCallback(decodeURIComponent(match[1]), new URLSearchParams(window.location.search)));
+    submitResult(await api.completeSocialCallback(
+      decodeURIComponent(match[1]),
+      new URLSearchParams(window.location.search),
+      state.settings,
+    ));
   } catch (error) {
     state.view = 'sign-in';
     setError(error);

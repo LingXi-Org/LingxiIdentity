@@ -1,6 +1,13 @@
 import type { UIError } from './errors';
 import { normalizeExperienceError } from './errors';
-import type { ExperienceSettings, Identifier, Interaction, InteractionEvent, SocialConnector } from './experience-config';
+import {
+  allowsRegistration,
+  type ExperienceSettings,
+  type Identifier,
+  type Interaction,
+  type InteractionEvent,
+  type SocialConnector,
+} from './experience-config';
 
 export type SubmitResponse = { redirectTo?: string };
 export type VerificationResponse = { verificationId: string };
@@ -38,8 +45,20 @@ const errorPayload = (payload: unknown): { code?: string; message?: string; deta
   return {
     code: typeof nested.code === 'string' ? nested.code : undefined,
     message: typeof nested.message === 'string' ? nested.message : undefined,
-    details: nested.details,
+    // Logto 1.33 serializes structured error metadata (including the
+    // `relatedUser` social-link hint) in `data`; older responses used
+    // `details`.
+    details: nested.details ?? nested.data,
   };
+};
+
+const socialRedirectUri = (connectorId: string) =>
+  `${window.location.origin}/callback/social/${encodeURIComponent(connectorId)}`;
+
+const hasRelatedUser = (details: unknown) => {
+  if (!details || typeof details !== 'object') return false;
+  const data = details as Record<string, unknown>;
+  return Boolean(data.relatedUser ?? data.related_user);
 };
 
 export class ExperienceApi {
@@ -117,10 +136,14 @@ export class ExperienceApi {
     });
   }
 
-  identify(verificationId?: string) {
+  identify(verificationId?: string, linkSocialIdentity?: boolean) {
+    const payload = {
+      ...(verificationId ? { verificationId } : {}),
+      ...(linkSocialIdentity === undefined ? {} : { linkSocialIdentity }),
+    };
     return this.request<void>('/api/experience/identification', {
       method: 'POST',
-      body: JSON.stringify(verificationId ? { verificationId } : {}),
+      body: JSON.stringify(payload),
     });
   }
 
@@ -188,7 +211,7 @@ export class ExperienceApi {
   async socialAuthorization(connector: SocialConnector) {
     await this.initInteraction('SignIn');
     const state = crypto.randomUUID();
-    const redirectUri = `${window.location.origin}/callback/social/${encodeURIComponent(connector.id)}`;
+    const redirectUri = socialRedirectUri(connector.id);
     const result = await this.request<SocialAuthorizationResponse>(
       `/api/experience/verification/social/${encodeURIComponent(connector.id)}/authorization-uri`,
       { method: 'POST', body: JSON.stringify({ state, redirectUri }) }
@@ -197,24 +220,61 @@ export class ExperienceApi {
       connectorId: connector.id,
       verificationId: result.verificationId,
       state,
+      redirectUri,
     }));
     return result.authorizationUri;
   }
 
-  async completeSocialCallback(connectorId: string, params: URLSearchParams) {
+  async completeSocialCallback(
+    connectorId: string,
+    params: URLSearchParams,
+    settings?: ExperienceSettings
+  ) {
     const raw = sessionStorage.getItem('lingxi_experience_social');
     if (!raw) throw new ExperienceApiError('Social sign-in session not found', { code: 'session.expired', status: 400 });
-    const saved = JSON.parse(raw) as { connectorId: string; verificationId: string; state: string };
+    const saved = JSON.parse(raw) as {
+      connectorId: string;
+      verificationId: string;
+      state: string;
+      redirectUri?: string;
+    };
     if (saved.connectorId !== connectorId || saved.state !== params.get('state')) {
       throw new ExperienceApiError('Social sign-in state mismatch', { code: 'session.state_mismatch', status: 400 });
     }
-    const connectorData: Record<string, string> = {};
-    params.forEach((value, key) => { if (key !== 'state') connectorData[key] = value; });
+    // Logto connectors consume the complete provider callback query (including
+    // state) and the exact redirect URI used to create the authorization URL.
+    const connectorData: Record<string, string> = Object.fromEntries(params.entries());
+    connectorData.redirectUri = socialRedirectUri(connectorId);
     const verification = await this.request<VerificationResponse>(
       `/api/experience/verification/social/${encodeURIComponent(connectorId)}/verify`,
       { method: 'POST', body: JSON.stringify({ connectorData, verificationId: saved.verificationId }) }
     );
-    await this.identify(verification.verificationId);
+
+    try {
+      await this.identify(verification.verificationId);
+    } catch (error) {
+      if (!(error instanceof ExperienceApiError) || error.code !== 'user.identity_not_exist' || !settings) {
+        throw error;
+      }
+
+      const automaticAccountLinking = settings.socialSignIn?.automaticAccountLinking === true;
+      const relatedUser = hasRelatedUser(error.details);
+
+      if (relatedUser && automaticAccountLinking) {
+        // Logto's SignIn identification contract links the verified social
+        // identity to the related account when this flag is true.
+        await this.identify(verification.verificationId, true);
+      } else if (!relatedUser && allowsRegistration(settings)) {
+        // A first-time social identity with no related account can be created
+        // through the normal Register interaction. The profile endpoint
+        // attaches the verified social identity before identification.
+        await this.setInteractionEvent('Register');
+        await this.updateProfile({ type: 'social', verificationId: verification.verificationId });
+        await this.identify();
+      } else {
+        throw error;
+      }
+    }
     sessionStorage.removeItem('lingxi_experience_social');
     return this.submit();
   }

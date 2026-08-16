@@ -24,11 +24,16 @@ export type ExperienceSettings = {
   color?: { primaryColor?: string; darkPrimaryColor?: string; isDarkModeEnabled?: boolean };
   branding?: { logoUrl?: string; darkLogoUrl?: string; favicon?: string; darkFavicon?: string };
   signIn?: { methods?: SignInMethod[] };
+  signInMode?: 'SignIn' | 'Register' | 'SignInAndRegister' | string;
   signUp?: {
     identifiers?: string[];
     password?: boolean;
     verify?: boolean;
     secondaryIdentifiers?: Array<{ identifier: string; verify?: boolean }>;
+  };
+  socialSignIn?: {
+    automaticAccountLinking?: boolean;
+    skipRequiredIdentifiers?: boolean;
   };
   forgotPassword?: { email?: boolean; phone?: boolean };
   passwordPolicy?: PasswordPolicy;
@@ -72,6 +77,15 @@ export const signInMethod = (settings: ExperienceSettings, identifier: string): 
 
 export const hasForgotPassword = (settings: ExperienceSettings) =>
   Boolean(settings.forgotPassword?.email || settings.forgotPassword?.phone);
+
+/**
+ * Social sign-in may fall back to registration only when registration is
+ * enabled by the sign-in mode and a primary sign-up identifier is configured.
+ */
+export const allowsRegistration = (settings: ExperienceSettings) =>
+  settings.signInMode !== undefined
+    ? settings.signInMode !== 'SignIn'
+    : Boolean(settings.signUp?.identifiers?.length);
 
 /** Fast, client-side checks only. Logto remains the source of truth for all password policy rules. */
 export const passwordPolicyError = (policy: PasswordPolicy | undefined, password: string) => {
