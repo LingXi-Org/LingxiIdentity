@@ -78,8 +78,8 @@ export const passwordPolicyError = (policy: PasswordPolicy | undefined, password
   if (!policy) return undefined;
   const min = policy.length?.min;
   const max = policy.length?.max;
-  if (min && password.length < min) return `Password must be at least ${min} characters.`;
-  if (max && password.length > max) return `Password must be at most ${max} characters.`;
+  if (min && password.length < min) return `密码至少需要 ${min} 个字符。`;
+  if (max && password.length > max) return `密码最多只能包含 ${max} 个字符。`;
   const requiredTypes = policy.characterTypes?.min ?? 1;
   const types = new Set<string>();
   for (const character of password) {
@@ -87,8 +87,8 @@ export const passwordPolicyError = (policy: PasswordPolicy | undefined, password
     else if (/[A-Z]/.test(character)) types.add('uppercase');
     else if (/[0-9]/.test(character)) types.add('digits');
     else if ('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ '.includes(character)) types.add('symbols');
-    else return 'Password contains an unsupported character.';
+    else return '密码包含暂不支持的字符。';
   }
-  if (types.size < requiredTypes) return `Use at least ${requiredTypes} different character types.`;
+  if (types.size < requiredTypes) return `密码至少需要包含 ${requiredTypes} 类字符。`;
   return undefined;
 };
