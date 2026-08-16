@@ -1,8 +1,5 @@
 import { normalizeExperienceError, type UIError } from '../lib/errors';
-import {
-  api,
-  type SubmitResponse,
-} from '../lib/experience-api';
+import { api, type SubmitResponse } from '../lib/experience-api';
 import {
   hasForgotPassword,
   isEmail,
@@ -25,6 +22,12 @@ type AppState = {
   view: View;
   identifier?: Identifier;
   verificationId?: string;
+  /**
+   * Registration passwords are deliberately kept only in page memory between
+   * the identifier/password step and the verification-code step. They are
+   * never written to localStorage/sessionStorage and disappear on refresh.
+   */
+  registrationPassword?: string;
   error?: UIError;
   busy: boolean;
 };
@@ -37,7 +40,7 @@ const escapeHtml = (value: unknown) => String(value ?? '')
   .replaceAll("'", '&#039;');
 
 const root = document.querySelector<HTMLElement>('#app');
-if (!root) throw new Error('Lingxi Experience app root is missing');
+if (!root) throw new Error('缺少 Lingxi Experience 根节点');
 
 const state: AppState = { view: 'sign-in', busy: false };
 
@@ -48,9 +51,6 @@ const firstScreen = () => {
   return undefined;
 };
 
-const interactionRecord = (type: string) =>
-  state.interaction?.verificationRecords?.find((record) => record.type === type);
-
 const setUrl = (view: View) => {
   const path = view === 'register' || view === 'register-verify' ? '/register'
     : view === 'forgot' || view === 'forgot-verify' ? '/reset-password' : '/sign-in';
@@ -60,7 +60,7 @@ const setUrl = (view: View) => {
   window.history.replaceState({}, '', `${path}${query}`);
 };
 
-const identifierLabel = (type: string) => type === 'username' ? 'Username' : type === 'phone' ? 'Phone number' : 'Email';
+const identifierLabel = (type: string) => type === 'username' ? '用户名' : type === 'phone' ? '手机号' : '邮箱';
 
 const getPrimaryColor = () => state.settings?.color?.primaryColor ?? '#111111';
 
@@ -72,13 +72,17 @@ const submitResult = (result: SubmitResponse | undefined) => {
   const redirectTo = result?.redirectTo;
   if (!redirectTo) {
     state.view = 'sign-in';
-    state.error = { code: 'experience.redirect_missing', message: 'Sign-in completed. Return to the application to continue.', field: 'form' };
+    state.error = {
+      code: 'experience.redirect_missing',
+      message: '身份验证已完成，但未收到返回应用的地址。请返回灵犀智学后重试。',
+      field: 'form',
+    };
     render();
     return;
   }
   const target = new URL(redirectTo, window.location.origin);
   if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-    throw new Error('Unsupported redirect protocol');
+    throw new Error('不支持的重定向协议');
   }
   window.location.assign(target.href);
 };
@@ -89,46 +93,89 @@ const setError = (error: unknown) => {
   render();
 };
 
-const errorHtml = () => state.error ? `<p class="form-message error" role="alert">${escapeHtml(state.error.message)}</p>` : '';
+const errorHtml = () => state.error
+  ? `<p class="form-message error" role="alert">${escapeHtml(state.error.message)}</p>`
+  : '';
 
-const shell = (title: string, description: string, content: string, footer = '') => {
+const registrationLegal = `
+  <p class="legal">
+    注册即表示你同意我们的
+    <a href="https://lingxilearn.cn/terms" target="_blank" rel="noopener noreferrer">服务条款</a>
+    和
+    <a href="https://lingxilearn.cn/privacy" target="_blank" rel="noopener noreferrer">隐私政策</a>
+  </p>`;
+
+const shell = (
+  title: string,
+  description: string,
+  content: string,
+  footer = '',
+  legal = ''
+) => {
   const brand = state.settings?.branding?.logoUrl;
   root.innerHTML = `
     <div class="auth-page">
       <section class="auth-card" aria-labelledby="auth-title">
         <header class="auth-header">
-          ${brand ? `<img class="brand-logo" src="${escapeHtml(brand)}" alt="Lingxi" />` : '<div class="brand-mark" aria-hidden="true">L</div>'}
+          ${brand ? `<img class="brand-logo" src="${escapeHtml(brand)}" alt="灵犀智学" />` : '<div class="brand-mark" aria-hidden="true">L</div>'}
           <h1 id="auth-title">${escapeHtml(title)}</h1>
           <p class="auth-description">${escapeHtml(description)}</p>
         </header>
         ${content}
         ${footer ? `<footer class="auth-footer">${footer}</footer>` : ''}
       </section>
-      <p class="legal">By continuing, you agree to the Lingxi terms and privacy policy.</p>
+      ${legal}
     </div>`;
   document.documentElement.style.setProperty('--primary', getPrimaryColor());
 };
 
-const button = (label: string, disabled = false) => `<button class="primary-button" type="submit" ${disabled ? 'disabled' : ''}>${disabled ? '<span class="spinner" aria-hidden="true"></span>' : ''}${escapeHtml(label)}</button>`;
+const button = (label: string, disabled = false) => `
+  <button class="primary-button" type="submit" ${disabled ? 'disabled' : ''}>
+    ${disabled ? '<span class="spinner" aria-hidden="true"></span>' : ''}${escapeHtml(label)}
+  </button>`;
+
+const attachPasswordToggles = () => {
+  root.querySelectorAll<HTMLButtonElement>('.password-toggle').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const input = root.querySelector<HTMLInputElement>(`#${toggle.dataset.target}`);
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
+      toggle.textContent = input.type === 'password' ? '显示' : '隐藏';
+    });
+  });
+};
 
 const renderSignIn = () => {
-  const method = state.settings && (signInMethod(state.settings, 'email') ?? state.settings.signIn?.methods?.[0]);
-  const type = method?.identifier === 'phone' || method?.identifier === 'username' ? method.identifier : 'email';
+  const method = state.settings
+    && (signInMethod(state.settings, 'email') ?? state.settings.signIn?.methods?.[0]);
+  const type = method?.identifier === 'phone' || method?.identifier === 'username'
+    ? method.identifier
+    : 'email';
   const connectors = state.settings?.socialConnectors ?? [];
   const forgot = hasForgotPassword(state.settings ?? {});
   const content = `
     <form id="sign-in-form" class="auth-form" novalidate>
       <label for="identifier">${identifierLabel(type)}</label>
-      <input id="identifier" name="identifier" type="${type === 'email' ? 'email' : 'text'}" autocomplete="${type}" required placeholder="${type === 'email' ? 'you@example.com' : ''}" />
-      <label for="password">Password</label>
-      <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" required /><button type="button" class="password-toggle" data-target="password" aria-label="Show password">Show</button></div>
-      ${forgot ? '<button type="button" class="text-button" data-action="forgot">Forgot password?</button>' : ''}
+      <input id="identifier" name="identifier" type="${type === 'email' ? 'email' : 'text'}" autocomplete="${type}" required placeholder="${type === 'email' ? 'name@example.com' : ''}" />
+      <label for="password">密码</label>
+      <div class="password-wrap">
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button type="button" class="password-toggle" data-target="password" aria-label="显示密码">显示</button>
+      </div>
+      ${forgot ? '<button type="button" class="text-button" data-action="forgot">忘记密码？</button>' : ''}
       ${errorHtml()}
-      ${button('Continue', state.busy)}
+      ${button('登录', state.busy)}
     </form>
-    ${connectors.length ? `<div class="divider"><span>or continue with</span></div><div class="social-list">${connectors.map((connector) => `<button class="social-button" type="button" data-social="${escapeHtml(connector.id)}">${escapeHtml(connector.name ?? connector.target ?? connector.id)}</button>`).join('')}</div>` : ''}`;
-  const footer = state.settings?.signUp?.identifiers?.length ? `Don't have an account? <button type="button" class="text-button" data-action="register">Create account</button>` : '';
-  shell('Welcome back', 'Sign in to continue to Lingxi.', content, footer);
+    ${connectors.length ? `
+      <div class="divider"><span>或使用以下方式继续</span></div>
+      <div class="social-list">
+        ${connectors.map((connector) => `<button class="social-button" type="button" data-social="${escapeHtml(connector.id)}">${escapeHtml(connector.name ?? connector.target ?? connector.id)}</button>`).join('')}
+      </div>` : ''}`;
+  const footer = state.settings?.signUp?.identifiers?.length
+    ? '还没有账户？ <button type="button" class="text-button" data-action="register">立即注册</button>'
+    : '';
+  shell('欢迎回来', '登录你的灵犀智学账户', content, footer);
+
   root.querySelector<HTMLFormElement>('#sign-in-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     state.error = undefined;
@@ -136,12 +183,16 @@ const renderSignIn = () => {
     const value = String(form.get('identifier') ?? '').trim();
     const password = String(form.get('password') ?? '');
     if ((type === 'email' && !isEmail(value)) || (type === 'phone' && !isPhone(value)) || !value) {
-      state.error = { code: 'guard.invalid_input', message: `Enter a valid ${identifierLabel(type).toLowerCase()}.`, field: 'identifier' };
+      state.error = {
+        code: 'guard.invalid_input',
+        message: `请输入有效的${identifierLabel(type)}。`,
+        field: 'identifier',
+      };
       render();
       return;
     }
     if (!password) {
-      state.error = { code: 'guard.invalid_input', message: 'Enter your password.', field: 'password' };
+      state.error = { code: 'guard.invalid_input', message: '请输入密码。', field: 'password' };
       render();
       return;
     }
@@ -149,10 +200,13 @@ const renderSignIn = () => {
     render();
     try {
       submitResult(await api.signIn({ type: type as Identifier['type'], value }, password));
-    } catch (error) { setError(error); }
+    } catch (error) {
+      setError(error);
+    }
   });
   attachActions();
   attachSocial(connectors);
+  attachPasswordToggles();
   focusFirst();
 };
 
@@ -160,47 +214,75 @@ const renderRegister = () => {
   const type = primarySignUpIdentifier(state.settings ?? {});
   const passwordRequired = state.settings?.signUp?.password !== false;
   const policy = state.settings?.passwordPolicy;
-  const policyText = policy?.length?.min ? `Password must be at least ${policy.length.min} characters.` : '';
+  const policyText = policy?.length?.min ? `密码至少需要 ${policy.length.min} 个字符。` : '';
   const content = `
     <form id="register-form" class="auth-form" novalidate>
       <label for="identifier">${identifierLabel(type)}</label>
-      <input id="identifier" name="identifier" type="${type === 'email' ? 'email' : 'text'}" autocomplete="${type}" required />
-      ${passwordRequired ? '<label for="password">Password</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required /><button type="button" class="password-toggle" data-target="password" aria-label="Show password">Show</button></div>' : ''}
+      <input id="identifier" name="identifier" type="${type === 'email' ? 'email' : 'text'}" autocomplete="${type}" required placeholder="${type === 'email' ? 'name@example.com' : ''}" />
+      ${passwordRequired ? `
+        <label for="password">密码</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password" autocomplete="new-password" required />
+          <button type="button" class="password-toggle" data-target="password" aria-label="显示密码">显示</button>
+        </div>` : ''}
       ${policyText ? `<p class="field-hint">${escapeHtml(policyText)}</p>` : ''}
       ${errorHtml()}
-      ${button('Create account', state.busy)}
+      ${button(type === 'email' || type === 'phone' ? '继续并发送验证码' : '创建账户', state.busy)}
     </form>`;
-  shell('Create your account', 'Start building with Lingxi.', content, 'Already have an account? <button type="button" class="text-button" data-action="signin">Sign in</button>');
+  shell(
+    '创建账户',
+    '注册灵犀智学账户',
+    content,
+    '已有账户？ <button type="button" class="text-button" data-action="signin">返回登录</button>',
+    registrationLegal
+  );
+
   root.querySelector<HTMLFormElement>('#register-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    state.error = undefined;
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const value = String(form.get('identifier') ?? '').trim();
     const password = String(form.get('password') ?? '');
     if ((type === 'email' && !isEmail(value)) || (type === 'phone' && !isPhone(value)) || !value) {
-      state.error = { code: 'guard.invalid_input', message: `Enter a valid ${identifierLabel(type).toLowerCase()}.`, field: 'identifier' };
+      state.error = {
+        code: 'guard.invalid_input',
+        message: `请输入有效的${identifierLabel(type)}。`,
+        field: 'identifier',
+      };
       render();
       return;
     }
     if (passwordRequired && !password) {
-      state.error = { code: 'guard.invalid_input', message: 'Choose a password.', field: 'password' };
+      state.error = { code: 'guard.invalid_input', message: '请设置密码。', field: 'password' };
       render();
       return;
     }
-    const passwordPolicyMessage = passwordRequired ? passwordPolicyError(state.settings?.passwordPolicy, password) : undefined;
+    const passwordPolicyMessage = passwordRequired
+      ? passwordPolicyError(state.settings?.passwordPolicy, password)
+      : undefined;
     if (passwordPolicyMessage) {
       state.error = { code: 'guard.invalid_input', message: passwordPolicyMessage, field: 'password' };
       render();
       return;
     }
-    state.busy = true;
+
     state.identifier = { type, value };
+    state.registrationPassword = passwordRequired ? password : undefined;
+    state.busy = true;
     render();
     try {
-      const verification = await api.beginRegistration(state.identifier, state.settings?.signUp?.verify !== false);
+      const verification = await api.beginRegistration(
+        state.identifier,
+        state.settings?.signUp?.verify !== false
+      );
       if (!verification) {
-        if (password) await api.updateProfile({ type: 'password', value: password });
+        if (state.registrationPassword) {
+          await api.updateProfile({ type: 'password', value: state.registrationPassword });
+        }
         await api.identify();
-        submitResult(await api.submit());
+        const result = await api.submit();
+        state.registrationPassword = undefined;
+        submitResult(result);
         return;
       }
       state.verificationId = verification.verificationId;
@@ -208,53 +290,74 @@ const renderRegister = () => {
       state.view = 'register-verify';
       setUrl(state.view);
       render();
-    } catch (error) { setError(error); }
+    } catch (error) {
+      setError(error);
+    }
   });
   attachActions();
-  root.querySelectorAll<HTMLButtonElement>('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
-    const input = root.querySelector<HTMLInputElement>(`#${toggle.dataset.target}`);
-    if (input) { input.type = input.type === 'password' ? 'text' : 'password'; toggle.textContent = input.type === 'password' ? 'Show' : 'Hide'; }
-  }));
+  attachPasswordToggles();
   focusFirst();
 };
 
 const renderRegisterVerify = () => {
+  const passwordRequired = state.settings?.signUp?.password !== false;
+  if (!state.identifier || !state.verificationId || (passwordRequired && !state.registrationPassword)) {
+    state.view = 'register';
+    state.identifier = undefined;
+    state.verificationId = undefined;
+    state.registrationPassword = undefined;
+    state.error = {
+      code: 'session.verification_session_not_found',
+      message: '注册页面已刷新，请重新填写邮箱和密码以继续。',
+      field: 'form',
+    };
+    setUrl(state.view);
+    render();
+    return;
+  }
+
   const content = `
     <form id="register-verify-form" class="auth-form" novalidate>
-      <p class="step-note">We sent a verification code to <strong>${escapeHtml(state.identifier?.value)}</strong>.</p>
-      <label for="code">Verification code</label>
+      <p class="step-note">验证码已发送至 <strong>${escapeHtml(state.identifier.value)}</strong></p>
+      <label for="code">验证码</label>
       <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required />
-      <label for="password">Password</label>
-      <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required /><button type="button" class="password-toggle" data-target="password">Show</button></div>
       ${errorHtml()}
-      ${button('Verify and create account', state.busy)}
+      ${button('验证并完成注册', state.busy)}
     </form>`;
-  shell('Verify your email', 'Enter the code to finish creating your account.', content, '<button type="button" class="text-button" data-action="register">Use a different email</button>');
+  shell(
+    state.identifier.type === 'phone' ? '验证手机号' : '验证邮箱',
+    '输入收到的验证码即可完成注册，无需再次输入密码。',
+    content,
+    `<button type="button" class="text-button" data-action="register">更换${identifierLabel(state.identifier.type)}</button>`,
+    registrationLegal
+  );
+
   root.querySelector<HTMLFormElement>('#register-verify-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    state.error = undefined;
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const code = String(form.get('code') ?? '').trim();
-    const password = String(form.get('password') ?? '');
-    if (!code || !password || !state.identifier || !state.verificationId) {
-      state.error = { code: 'guard.invalid_input', message: 'Enter the code and choose a password.', field: 'form' };
-      render();
-      return;
-    }
-    const passwordPolicyMessage = passwordPolicyError(state.settings?.passwordPolicy, password);
-    if (passwordPolicyMessage) {
-      state.error = { code: 'guard.invalid_input', message: passwordPolicyMessage, field: 'password' };
+    if (!code || !state.identifier || !state.verificationId) {
+      state.error = { code: 'guard.invalid_input', message: '请输入验证码。', field: 'code' };
       render();
       return;
     }
     state.busy = true;
     render();
-    try { submitResult(await api.finishRegistration(state.identifier, state.verificationId, code, password)); } catch (error) { setError(error); }
+    try {
+      const result = await api.finishRegistration(
+        state.identifier,
+        state.verificationId,
+        code,
+        state.registrationPassword
+      );
+      state.registrationPassword = undefined;
+      submitResult(result);
+    } catch (error) {
+      setError(error);
+    }
   });
   attachActions();
-  root.querySelectorAll<HTMLButtonElement>('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
-    const input = root.querySelector<HTMLInputElement>(`#${toggle.dataset.target}`);
-    if (input) { input.type = input.type === 'password' ? 'text' : 'password'; toggle.textContent = input.type === 'password' ? 'Show' : 'Hide'; }
-  }));
   focusFirst();
 };
 
@@ -265,21 +368,33 @@ const renderForgot = () => {
   const type = phoneEnabled && !emailEnabled ? 'phone' : 'email';
   const content = `
     <form id="forgot-form" class="auth-form" novalidate>
-      ${bothEnabled ? '<label for="identifier-type">Recovery method</label><select id="identifier-type" name="identifier-type"><option value="email">Email</option><option value="phone">Phone number</option></select>' : ''}
+      ${bothEnabled ? '<label for="identifier-type">找回方式</label><select id="identifier-type" name="identifier-type"><option value="email">邮箱</option><option value="phone">手机号</option></select>' : ''}
       <label for="identifier">${identifierLabel(type)}</label>
       <input id="identifier" name="identifier" type="${type === 'email' ? 'email' : 'text'}" autocomplete="${type}" required />
       ${errorHtml()}
-      ${button('Send code', state.busy)}
+      ${button('发送验证码', state.busy)}
     </form>`;
-  shell('Reset your password', 'We will send a verification code to your account.', content, '<button type="button" class="text-button" data-action="signin">Back to sign in</button>');
+  shell(
+    '重置密码',
+    '我们会向已验证的账户发送验证码',
+    content,
+    '<button type="button" class="text-button" data-action="signin">返回登录</button>'
+  );
+
   root.querySelector<HTMLFormElement>('#forgot-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    state.error = undefined;
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const selectedType = String(form.get('identifier-type') ?? type);
     const selectedIdentifierType = selectedType === 'phone' ? 'phone' : 'email';
     const value = String(form.get('identifier') ?? '').trim();
-    if ((selectedIdentifierType === 'email' && !isEmail(value)) || (selectedIdentifierType === 'phone' && !isPhone(value))) {
-      state.error = { code: 'guard.invalid_input', message: `Enter a valid ${identifierLabel(selectedIdentifierType).toLowerCase()}.`, field: 'identifier' };
+    if ((selectedIdentifierType === 'email' && !isEmail(value))
+      || (selectedIdentifierType === 'phone' && !isPhone(value))) {
+      state.error = {
+        code: 'guard.invalid_input',
+        message: `请输入有效的${identifierLabel(selectedIdentifierType)}。`,
+        field: 'identifier',
+      };
       render();
       return;
     }
@@ -293,13 +408,19 @@ const renderForgot = () => {
       state.view = 'forgot-verify';
       setUrl(state.view);
       render();
-    } catch (error) { setError(error); }
+    } catch (error) {
+      setError(error);
+    }
   });
+
   root.querySelector<HTMLSelectElement>('#identifier-type')?.addEventListener('change', (event) => {
     const selected = (event.currentTarget as HTMLSelectElement).value === 'phone' ? 'phone' : 'email';
     const input = root.querySelector<HTMLInputElement>('#identifier');
     const label = root.querySelector<HTMLLabelElement>('label[for="identifier"]');
-    if (input) { input.type = selected === 'email' ? 'email' : 'text'; input.setAttribute('autocomplete', selected); }
+    if (input) {
+      input.type = selected === 'email' ? 'email' : 'text';
+      input.setAttribute('autocomplete', selected);
+    }
     if (label) label.textContent = identifierLabel(selected);
   });
   attachActions();
@@ -309,25 +430,39 @@ const renderForgot = () => {
 const renderForgotVerify = () => {
   const content = `
     <form id="forgot-verify-form" class="auth-form" novalidate>
-      <p class="step-note">We sent a verification code to <strong>${escapeHtml(state.identifier?.value)}</strong>.</p>
-      <label for="code">Verification code</label>
+      <p class="step-note">验证码已发送至 <strong>${escapeHtml(state.identifier?.value)}</strong></p>
+      <label for="code">验证码</label>
       <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required />
-      <label for="password">New password</label>
-      <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required /><button type="button" class="password-toggle" data-target="password">Show</button></div>
-      <label for="confirm">Confirm new password</label>
+      <label for="password">新密码</label>
+      <div class="password-wrap">
+        <input id="password" name="password" type="password" autocomplete="new-password" required />
+        <button type="button" class="password-toggle" data-target="password">显示</button>
+      </div>
+      <label for="confirm">确认新密码</label>
       <input id="confirm" name="confirm" type="password" autocomplete="new-password" required />
       ${errorHtml()}
-      ${button('Reset password', state.busy)}
+      ${button('重置密码', state.busy)}
     </form>`;
-  shell('Choose a new password', 'Use a password you have not used elsewhere.', content, '<button type="button" class="text-button" data-action="signin">Back to sign in</button>');
+  shell(
+    '设置新密码',
+    '请设置一个新的账户密码',
+    content,
+    '<button type="button" class="text-button" data-action="signin">返回登录</button>'
+  );
+
   root.querySelector<HTMLFormElement>('#forgot-verify-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    state.error = undefined;
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const code = String(form.get('code') ?? '').trim();
     const password = String(form.get('password') ?? '');
     const confirm = String(form.get('confirm') ?? '');
     if (!code || !password || password !== confirm || !state.identifier || !state.verificationId) {
-      state.error = { code: 'guard.invalid_input', message: password !== confirm ? 'Passwords do not match.' : 'Enter the code and a new password.', field: 'form' };
+      state.error = {
+        code: 'guard.invalid_input',
+        message: password !== confirm ? '两次输入的密码不一致。' : '请输入验证码和新密码。',
+        field: 'form',
+      };
       render();
       return;
     }
@@ -339,49 +474,73 @@ const renderForgotVerify = () => {
     }
     state.busy = true;
     render();
-    try { submitResult(await api.finishForgotPassword(state.identifier, state.verificationId, code, password)); } catch (error) { setError(error); }
+    try {
+      submitResult(await api.finishForgotPassword(
+        state.identifier,
+        state.verificationId,
+        code,
+        password
+      ));
+    } catch (error) {
+      setError(error);
+    }
   });
   attachActions();
-  root.querySelectorAll<HTMLButtonElement>('.password-toggle').forEach((toggle) => toggle.addEventListener('click', () => {
-    const input = root.querySelector<HTMLInputElement>(`#${toggle.dataset.target}`);
-    if (input) { input.type = input.type === 'password' ? 'text' : 'password'; toggle.textContent = input.type === 'password' ? 'Show' : 'Hide'; }
-  }));
+  attachPasswordToggles();
   focusFirst();
 };
 
 const attachSocial = (connectors: SocialConnector[]) => {
-  root.querySelectorAll<HTMLButtonElement>('[data-social]').forEach((buttonElement) => buttonElement.addEventListener('click', async () => {
-    const connector = connectors.find((item) => item.id === buttonElement.dataset.social);
-    if (!connector) return;
-    state.busy = true;
-    render();
-    try { window.location.assign(await api.socialAuthorization(connector)); } catch (error) { setError(error); }
-  }));
+  root.querySelectorAll<HTMLButtonElement>('[data-social]').forEach((buttonElement) => {
+    buttonElement.addEventListener('click', async () => {
+      const connector = connectors.find((item) => item.id === buttonElement.dataset.social);
+      if (!connector) return;
+      state.busy = true;
+      render();
+      try {
+        window.location.assign(await api.socialAuthorization(connector));
+      } catch (error) {
+        setError(error);
+      }
+    });
+  });
 };
 
 const attachActions = () => {
-  root.querySelectorAll<HTMLElement>('[data-action]').forEach((element) => element.addEventListener('click', () => {
-    const action = element.dataset.action;
-    state.error = undefined;
-    state.busy = false;
-    if (action === 'register') state.view = 'register';
-    if (action === 'signin') state.view = 'sign-in';
-    if (action === 'forgot') state.view = 'forgot';
-    setUrl(state.view);
-    render();
-  }));
+  root.querySelectorAll<HTMLElement>('[data-action]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const action = element.dataset.action;
+      state.error = undefined;
+      state.busy = false;
+      state.identifier = undefined;
+      state.verificationId = undefined;
+      state.registrationPassword = undefined;
+      if (action === 'register') state.view = 'register';
+      if (action === 'signin') state.view = 'sign-in';
+      if (action === 'forgot') state.view = 'forgot';
+      setUrl(state.view);
+      render();
+    });
+  });
 };
 
 const renderCallback = async () => {
-  shell('Signing you in', 'Completing your secure sign-in with the provider.', '<div class="loading-panel"><span class="spinner"></span> Please wait…</div>');
+  shell(
+    '正在登录',
+    '正在完成第三方身份验证',
+    '<div class="loading-panel"><span class="spinner"></span> 请稍候…</div>'
+  );
   const match = window.location.pathname.match(/^\/callback\/social\/([^/]+)/);
   if (!match) {
     state.view = 'sign-in';
-    setError({ code: 'session.invalid_callback', message: 'Invalid provider callback.' });
+    setError({ code: 'session.invalid_callback', message: '无效的第三方登录回调。' });
     return;
   }
   try {
-    submitResult(await api.completeSocialCallback(decodeURIComponent(match[1]), new URLSearchParams(window.location.search)));
+    submitResult(await api.completeSocialCallback(
+      decodeURIComponent(match[1]),
+      new URLSearchParams(window.location.search)
+    ));
   } catch (error) {
     state.view = 'sign-in';
     setError(error);
@@ -389,7 +548,10 @@ const renderCallback = async () => {
 };
 
 const render = () => {
-  if (state.view === 'callback') { void renderCallback(); return; }
+  if (state.view === 'callback') {
+    void renderCallback();
+    return;
+  }
   if (state.view === 'register') return renderRegister();
   if (state.view === 'register-verify') return renderRegisterVerify();
   if (state.view === 'forgot') return renderForgot();
@@ -400,21 +562,28 @@ const render = () => {
 const restoreInteractionView = () => {
   const event = state.interaction?.interactionEvent;
   const pending = state.interaction?.verificationRecords?.find((record) =>
-    (record.type === 'EmailVerificationCode' || record.type === 'PhoneVerificationCode') && !record.verified
+    (record.type === 'EmailVerificationCode' || record.type === 'PhoneVerificationCode')
+      && !record.verified
   );
-  if (pending?.identifier && pending.id) {
+  if (pending?.identifier && pending.id && event === 'ForgotPassword') {
     state.identifier = pending.identifier;
     state.verificationId = pending.id;
-    if (event === 'Register') return 'register-verify' as const;
-    if (event === 'ForgotPassword') return 'forgot-verify' as const;
+    return 'forgot-verify' as const;
   }
+  // Registration passwords are intentionally not persisted. After a refresh,
+  // restart the short registration step instead of asking for the password a
+  // second time on the verification-code screen.
   if (event === 'Register') return 'register' as const;
   if (event === 'ForgotPassword') return 'forgot' as const;
   return 'sign-in' as const;
 };
 
 export const startExperience = async () => {
-  shell('Loading Lingxi', 'Preparing your secure sign-in.', '<div class="loading-panel"><span class="spinner"></span> Loading…</div>');
+  shell(
+    '正在加载',
+    '正在准备安全的身份验证流程',
+    '<div class="loading-panel"><span class="spinner"></span> 加载中…</div>'
+  );
   try {
     state.settings = await api.getSettings();
     if (window.location.pathname.startsWith('/callback/social/')) {
@@ -422,9 +591,13 @@ export const startExperience = async () => {
       render();
       return;
     }
-    try { state.interaction = await api.getInteraction(); } catch (error) {
+    try {
+      state.interaction = await api.getInteraction();
+    } catch (error) {
       const normalized = normalizeExperienceError(error);
-      if (normalized.status !== 404 && normalized.code !== 'session.interaction_not_found') throw error;
+      if (normalized.status !== 404 && normalized.code !== 'session.interaction_not_found') {
+        throw error;
+      }
     }
     state.view = firstScreen() ?? restoreInteractionView();
     render();
