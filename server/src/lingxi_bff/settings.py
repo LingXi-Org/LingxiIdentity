@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,6 +67,30 @@ class Settings(BaseSettings):
         # narrower configured path can make /api/v1/me succeed while the
         # workspace route sees no session and redirects back to /login.
         return "/"
+
+    @property
+    def effective_session_cookie_domain(self) -> str | None:
+        """Return the explicit cookie domain or derive the safe web parent domain.
+
+        Production auth is commonly started through the LingxiLearn origin while
+        the OIDC callback is handled by the identity subdomain. Host-only cookies
+        would therefore disappear between `/auth/register` and `/auth/callback`.
+        When the configured identity host is the web host itself or one of its
+        subdomains, sharing the web host as the cookie Domain is both sufficient
+        and narrowly scoped. Explicit SESSION_COOKIE_DOMAIN always wins.
+        """
+        if self.session_cookie_domain:
+            return self.session_cookie_domain.lstrip(".")
+        if not self.bff_web_public_url:
+            return None
+
+        web_host = urlsplit(self.bff_web_public_url).hostname
+        bff_host = urlsplit(self.bff_public_url).hostname
+        if not web_host or not bff_host:
+            return None
+        if bff_host == web_host or bff_host.endswith(f".{web_host}"):
+            return web_host
+        return None
 
     @property
     def resolved_m2m_secret(self) -> str:
