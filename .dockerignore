@@ -8,5 +8,7 @@ __pycache__
 .mypy_cache
 .ruff_cache
 *.egg-info
+experience/node_modules
+experience/dist
 dist
 build

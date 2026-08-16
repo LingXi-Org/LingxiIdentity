@@ -4,7 +4,7 @@ PYTHON ?= python
 COMPOSE := docker compose --env-file .env -f deployment/compose.yaml
 BOOTSTRAP_COMPOSE := docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml
 
-.PHONY: install lint format-check test typecheck compose-config dev-up prod-up bootstrap smoke down logs
+.PHONY: install lint format-check test typecheck experience-check experience-build compose-config dev-up prod-up bootstrap smoke down logs
 
 install:
 	$(PYTHON) -m pip install -e sdk/python -e server -e bootstrap -e ".[dev]"
@@ -17,6 +17,14 @@ format-check:
 
 typecheck:
 	$(PYTHON) -m mypy sdk/python/src server/src bootstrap
+
+experience-check:
+	npm --prefix experience run check
+
+experience-build:
+	npm --prefix experience ci --ignore-scripts --no-audit --no-fund
+	npm --prefix experience run check
+	npm --prefix experience run build
 
 test:
 	$(PYTHON) -m pytest -q
