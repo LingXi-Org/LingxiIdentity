@@ -1,0 +1,27 @@
+# Build the Lingxi Experience independently, then overlay only its static assets
+# on the pinned upstream Logto image. The Logto Core, Console, OIDC provider and
+# database migrations remain byte-for-byte from the upstream baseline.
+
+ARG LOGTO_VERSION=1.33.0
+
+FROM node:22-alpine AS experience-builder
+WORKDIR /build/experience
+ENV CI=true
+
+COPY experience/package.json experience/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY experience/ ./
+RUN npm run check && npm run build
+
+FROM ghcr.io/logto-io/logto:${LOGTO_VERSION}
+ARG LOGTO_VERSION=1.33.0
+LABEL org.opencontainers.image.title="Lingxi Logto" \
+      org.opencontainers.image.description="Logto ${LOGTO_VERSION} with the Lingxi custom Experience UI" \
+      org.opencontainers.image.source="https://github.com/LingXi-Org/LingxiIdentity"
+
+# Logto's v1.33.0 image is built from the monorepo Dockerfile and serves the
+# production Experience bundle from the package workspace path below. The
+# published image keeps the workspace packages for runtime, rather than a
+# top-level node_modules/@logto symlink. No server code or runtime configuration
+# is replaced.
+COPY --from=experience-builder /build/experience/dist/ /etc/logto/packages/experience/dist/

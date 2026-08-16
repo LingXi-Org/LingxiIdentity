@@ -86,7 +86,8 @@ principal = verifier.verify(access_token)
 ## 仓库结构
 
 ```text
-server/       BFF 与身份 API
+  experience/   Lingxi Custom Experience SPA（Logto v1.33.0 API）
+  server/       BFF 与身份 API
 sdk/python/   Python SDK
 bootstrap/    首次初始化工具
 deployment/   Docker Compose 部署配置

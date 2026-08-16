@@ -53,7 +53,28 @@ Terminate TLS at the external ingress and forward `X-Forwarded-Proto: https`. Ro
 
 Minimal Nginx, Caddy and Kubernetes Ingress examples are in `docs/edge-proxy/`. Adapt service names, certificates and network policy to the target environment.
 
+## Custom Experience image
+
+The default `LOGTO_IMAGE=lingxi-logto:1.33.0-experience` is built locally from
+`deployment/logto/Dockerfile.custom`. The build compiles `experience/` and
+overlays only the static Experience bundle on the pinned upstream
+`ghcr.io/logto-io/logto:1.33.0` runtime. See [custom-experience.md](custom-experience.md)
+for the API contract, security boundary and manual smoke flow.
+
+For a safe rollback, set `LOGTO_IMAGE=ghcr.io/logto-io/logto:1.33.0`, recreate
+`logto` and `logto-migrate`, and leave the database and BFF unchanged.
+
+The migration profile uses the Logto 1.33.0 CLI contract:
+`npm run cli -- db seed --swe && npm run cli -- db alteration deploy latest`.
+The npm `--` separator is required to forward the flags to Logto; the removed
+`--disable-admin-pwned-password-check` option is intentionally not used.
+
 ## Upgrade
 
-The deployment uses the pinned `${LOGTO_IMAGE}` value (default `ghcr.io/logto-io/logto:1.33.0`). Recreate the stack and verify `logto-migrate` completes before Logto starts. The migration service runs the official Logto seed/alteration commands; it never changes Logto source code.
-`LOGTO_IMAGE` defaults to the pinned `ghcr.io/logto-io/logto:1.33.0` image. Upgrade it deliberately after validating the Experience, Account and Verification API contracts.
+The deployment uses the pinned `${LOGTO_IMAGE}` value (default
+`lingxi-logto:1.33.0-experience`). Recreate the stack and verify
+`logto-migrate` completes before Logto starts. The migration service runs the
+official Logto seed/alteration commands; it never changes Logto source code.
+Upgrade `LOGTO_UPSTREAM_VERSION` deliberately only after validating the
+Experience, Account and Verification API contracts and rebuilding the custom
+image; do not use `latest`.

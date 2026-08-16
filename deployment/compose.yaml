@@ -19,7 +19,12 @@ services:
     networks: [lingxi]
 
   logto-migrate:
-    image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
+    image: ${LOGTO_IMAGE:-lingxi-logto:1.33.0-experience}
+    build:
+      context: ..
+      dockerfile: deployment/logto/Dockerfile.custom
+      args:
+        LOGTO_VERSION: ${LOGTO_UPSTREAM_VERSION:-1.33.0}
     profiles: [migration]
     entrypoint: []
     environment:
@@ -29,13 +34,18 @@ services:
       - sh
       - -c
       - >-
-        npm run cli db seed -- --disable-admin-pwned-password-check
-        && npm run alteration deploy latest
+        npm run cli -- db seed --swe
+        && npm run cli -- db alteration deploy latest
     restart: "no"
     networks: [lingxi]
 
   logto:
-    image: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
+    image: ${LOGTO_IMAGE:-lingxi-logto:1.33.0-experience}
+    build:
+      context: ..
+      dockerfile: deployment/logto/Dockerfile.custom
+      args:
+        LOGTO_VERSION: ${LOGTO_UPSTREAM_VERSION:-1.33.0}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -82,7 +92,7 @@ services:
       BFF_ALLOWED_HOSTS: ${BFF_ALLOWED_HOSTS:-*}
       LOGTO_PUBLIC_ENDPOINT: ${LOGTO_PUBLIC_ENDPOINT:-http://localhost:3001}
       LOGTO_INTERNAL_ENDPOINT: ${LOGTO_INTERNAL_ENDPOINT:-http://logto:3001}
-      LOGTO_IMAGE: ${LOGTO_IMAGE:-ghcr.io/logto-io/logto:1.33.0}
+      LOGTO_IMAGE: ${LOGTO_IMAGE:-lingxi-logto:1.33.0-experience}
       LOGTO_ISSUER: ${LOGTO_ISSUER:-http://localhost:3001/oidc}
       LOGTO_MANAGEMENT_API_INDICATOR: ${LOGTO_MANAGEMENT_API_INDICATOR:-https://default.logto.app/api}
       LOGTO_M2M_CLIENT_ID: ${LOGTO_M2M_CLIENT_ID:-}
