@@ -59,7 +59,19 @@ class Settings(BaseSettings):
 
     @property
     def allowed_hosts(self) -> list[str]:
-        return [item.strip() for item in self.bff_allowed_hosts.split(",") if item.strip()]
+        configured = [item.strip() for item in self.bff_allowed_hosts.split(",") if item.strip()]
+        if "*" in configured:
+            return configured
+
+        # Cross-Compose production deployments intentionally reach the BFF via
+        # the Docker host gateway. These fixed local names are not public trust
+        # expansion; they only prevent TrustedHostMiddleware from rejecting the
+        # internal LingxiLearn -> LingxiIdentity hop when a restrictive public
+        # host allow-list is configured.
+        for internal_host in ("localhost", "127.0.0.1", "host.docker.internal"):
+            if internal_host not in configured:
+                configured.append(internal_host)
+        return configured
 
     @property
     def effective_session_cookie_path(self) -> str:
