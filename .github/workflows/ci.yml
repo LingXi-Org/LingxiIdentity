@@ -34,5 +34,21 @@ jobs:
         run: |
           cp .env.example .env
           docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml config
+      - name: Guard BFF host/container port separation
+        run: |
+          BFF_PORT=18081 docker compose --env-file .env -f deployment/compose.yaml config --format json > /tmp/compose.json
+          python - <<'PY'
+          import json
+
+          with open('/tmp/compose.json', encoding='utf-8') as handle:
+              config = json.load(handle)
+
+          bff = config['services']['bff']
+          assert str(bff['environment']['BFF_PORT']) == '8080', bff['environment']['BFF_PORT']
+          assert any(
+              int(port['published']) == 18081 and int(port['target']) == 8080
+              for port in bff['ports']
+          ), bff['ports']
+          PY
       - name: Build images
         run: docker compose --env-file .env -f deployment/compose.yaml -f deployment/compose.bootstrap.yaml build
